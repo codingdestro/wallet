@@ -14,7 +14,6 @@ fn main() {
     } else if cmd.args[1] == "-r" && cmd.args.len() >= 3 {
         let key = cmd.args[2].clone().trim().to_string();
         wallet.del(&key);
-        println!("removing {}", cmd.args[2].clone());
     } else if cmd.args[1] == "-s" && cmd.args.len() >= 3 {
         let key = cmd.args[2].clone();
         match wallet.get(&key) {

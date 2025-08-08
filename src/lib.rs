@@ -54,6 +54,7 @@ impl Wallet {
         let mut file = std::fs::File::options()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(self.file_path.to_string())
             .expect("Failed to open file");
         for (key, value) in &self.list {
@@ -65,7 +66,8 @@ impl Wallet {
         self.list.insert(key, value);
     }
     pub fn del(&mut self, key: &String) {
-        self.list.remove(key);
+        println!("Deleting key: {}", &key);
+        self.list.remove(key).expect("failed to  delete value");
     }
     pub fn get(&self, key: &String) -> Option<&String> {
         self.list.get(key)
