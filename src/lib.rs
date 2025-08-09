@@ -38,9 +38,7 @@ impl Wallet {
             file.read_to_end(&mut buf).expect("Failed to read file");
         }
         let buf = String::from_utf8(buf).unwrap();
-        if buf.is_empty() {
-            println!("file is empty");
-        } else {
+        if !buf.is_empty() {
             for line in buf.lines() {
                 let parts: Vec<&str> = line.split(':').collect();
                 if parts.len() == 2 {
@@ -80,6 +78,29 @@ impl Wallet {
     pub fn print(&self) {
         for (key, value) in &self.list {
             println!("{}: {}", key, value);
+        }
+    }
+}
+
+pub struct Usage {
+    pub messages: Vec<String>,
+}
+
+impl Usage {
+    pub fn new() -> Self {
+        Self {
+            messages: Vec::new(),
+        }
+    }
+
+    pub fn from(messages: Vec<String>) -> Self {
+        Self { messages }
+    }
+
+    pub fn show(&self) {
+        println!("Usage:");
+        for message in self.messages.clone() {
+            println!("{}", message);
         }
     }
 }
