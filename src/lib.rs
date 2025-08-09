@@ -23,18 +23,16 @@ pub struct Wallet {
 impl Wallet {
     pub fn new() -> Self {
         let list = HashMap::new();
+        let homepath = std::env::var("HOME").unwrap();
         Wallet {
             list,
-            file_path: String::from("wallet.txt"),
+            file_path: String::from(format!("{}/wallet.txt", homepath)),
         }
     }
 
     pub fn load(&mut self) {
         let mut buf: Vec<u8> = Vec::new();
-        if let Ok(mut file) = std::fs::File::options()
-            .read(true)
-            .open(self.file_path.to_string())
-        {
+        if let Ok(mut file) = std::fs::File::options().read(true).open(&self.file_path) {
             file.read_to_end(&mut buf).expect("Failed to read file");
         }
         let buf = String::from_utf8(buf).unwrap();
