@@ -92,27 +92,171 @@ impl Wallet {
             println!("{}", key);
         }
     }
+    
+    pub fn get_keys(&self) -> Vec<String> {
+        self.list.keys().cloned().collect()
+    }
+    
+    pub fn key_exists(&self, key: &str) -> bool {
+        self.list.contains_key(key)
+    }
 }
 
 pub struct Usage {
-    pub messages: Vec<String>,
+    pub program_name: String,
+    pub version: String,
+    pub description: String,
+    pub commands: Vec<CommandHelp>,
+}
+
+pub struct CommandHelp {
+    pub flag: String,
+    pub usage: String,
+    pub description: String,
+    pub examples: Vec<String>,
 }
 
 impl Usage {
     pub fn new() -> Self {
         Self {
-            messages: Vec::new(),
+            program_name: "wallet".to_string(),
+            version: "1.0.0".to_string(),
+            description: "A secure command-line key-value store and password manager".to_string(),
+            commands: Vec::new(),
         }
     }
 
-    pub fn from(messages: Vec<String>) -> Self {
-        Self { messages }
+    pub fn default() -> Self {
+        let mut usage = Self::new();
+        usage.add_command(CommandHelp {
+            flag: "-a, --add".to_string(),
+            usage: "<KEY> <VALUE>".to_string(),
+            description: "Add or update a key-value pair in the wallet".to_string(),
+            examples: vec![
+                "wallet -a email john@example.com".to_string(),
+                "wallet --add github-token ghp_xxxxxxxxxxxx".to_string(),
+            ],
+        });
+        
+        usage.add_command(CommandHelp {
+            flag: "-s, --show".to_string(),
+            usage: "<KEY>".to_string(),
+            description: "Display the value for the specified key".to_string(),
+            examples: vec![
+                "wallet -s email".to_string(),
+                "wallet --show github-token".to_string(),
+            ],
+        });
+        
+        usage.add_command(CommandHelp {
+            flag: "-c, --copy".to_string(),
+            usage: "<KEY>".to_string(),
+            description: "Copy the value of the specified key to clipboard".to_string(),
+            examples: vec![
+                "wallet -c password".to_string(),
+                "wallet --copy api-key".to_string(),
+            ],
+        });
+        
+        usage.add_command(CommandHelp {
+            flag: "-l, --list".to_string(),
+            usage: "".to_string(),
+            description: "List all available keys (values are hidden for security)".to_string(),
+            examples: vec![
+                "wallet -l".to_string(),
+                "wallet --list".to_string(),
+            ],
+        });
+        
+        usage.add_command(CommandHelp {
+            flag: "-r, --remove".to_string(),
+            usage: "<KEY>".to_string(),
+            description: "Remove a key-value pair from the wallet".to_string(),
+            examples: vec![
+                "wallet -r old-password".to_string(),
+                "wallet --remove expired-token".to_string(),
+            ],
+        });
+        
+        usage.add_command(CommandHelp {
+            flag: "-h, --help".to_string(),
+            usage: "".to_string(),
+            description: "Show this help message".to_string(),
+            examples: vec![
+                "wallet -h".to_string(),
+                "wallet --help".to_string(),
+            ],
+        });
+        
+        usage
+    }
+
+    pub fn add_command(&mut self, command: CommandHelp) {
+        self.commands.push(command);
     }
 
     pub fn show(&self) {
-        println!("Usage:");
-        for message in self.messages.clone() {
-            println!("{}", message);
+        // Header
+        println!("{} v{}", self.program_name, self.version);
+        println!("{}", self.description);
+        println!();
+        
+        // Usage
+        println!("USAGE:");
+        println!("    {} [OPTIONS] [ARGS...]", self.program_name);
+        println!();
+        
+        // Options
+        println!("OPTIONS:");
+        for cmd in &self.commands {
+            let flag_width = 20;
+            let usage_part = if cmd.usage.is_empty() {
+                String::new()
+            } else {
+                format!(" {}", cmd.usage)
+            };
+            
+            println!("    {:<width$} {}", 
+                format!("{}{}", cmd.flag, usage_part), 
+                cmd.description, 
+                width = flag_width + cmd.usage.len()
+            );
         }
+        println!();
+        
+        // Examples
+        println!("EXAMPLES:");
+        for cmd in &self.commands {
+            if !cmd.examples.is_empty() {
+                for example in &cmd.examples {
+                    println!("    {}", example);
+                }
+            }
+        }
+        println!();
+        
+        // Footer
+        println!("STORAGE:");
+        println!("    Data is stored in: ~/wallet.txt");
+        println!("    Each line follows the format: key:value");
+        println!();
+        
+        println!("SECURITY NOTE:");
+        println!("    This tool stores data in plain text. For sensitive data,");
+        println!("    consider using additional encryption or a dedicated password manager.");
+    }
+
+    // Legacy method for backward compatibility
+    pub fn from(messages: Vec<String>) -> Self {
+        let mut usage = Self::new();
+        for msg in messages {
+            usage.commands.push(CommandHelp {
+                flag: "".to_string(),
+                usage: "".to_string(),
+                description: msg,
+                examples: vec![],
+            });
+        }
+        usage
     }
 }
