@@ -4,6 +4,8 @@ use std::{
     io::{Read, Write},
 };
 
+pub mod clipboard;
+
 pub struct Command {
     pub args: Vec<String>,
 }
@@ -68,14 +70,26 @@ impl Wallet {
     pub fn get(&self, key: &String) -> Option<&String> {
         self.list.get(key)
     }
+    pub fn copy(&mut self, key: &String) -> Result<(), ()> {
+        match self.list.get(key) {
+            Some(value) => match crate::clipboard::Clipboard::copy_with_message(value) {
+                Ok(_) => Ok(()),
+                Err(_) => {
+                    eprintln!("Failed to copy to clipboard");
+                    Err(())
+                }
+            },
+            None => Err(()),
+        }
+    }
 
     pub fn clear(&mut self) {
         self.list.clear();
     }
 
     pub fn print(&self) {
-        for (key, value) in &self.list {
-            println!("{}: {}", key, value);
+        for (key, _) in &self.list {
+            println!("{}", key);
         }
     }
 }

@@ -8,6 +8,7 @@ fn main() {
         String::from("-a key val - add new key pair"),
         String::from("-r key - delete key pair"),
         String::from("-s key - get key pair"),
+        String::from("-c key - copy value to clipboard"),
     ]);
     let mut wallet = Wallet::new();
     wallet.load();
@@ -32,6 +33,12 @@ fn main() {
         match wallet.get(&key) {
             Some(value) => println!("{}:\n{}", key, value),
             None => println!("not found {}", key),
+        }
+    } else if cmd.args[1] == "-c" && cmd.args.len() >= 3 {
+        let key = cmd.args[2].clone();
+        match wallet.copy(&key) {
+            Ok(()) => println!("Copied {} to clipboard", key),
+            Err(()) => println!("Failed to copy {} to clipboard", key),
         }
     }
 
