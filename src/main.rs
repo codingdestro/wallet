@@ -12,7 +12,7 @@ fn main() {
     }
 
     let command = &cmd.args[1];
-    
+
     match command.as_str() {
         "-a" | "--add" => {
             if cmd.args.len() >= 4 {
@@ -25,7 +25,7 @@ fn main() {
                 eprintln!("Usage: wallet -a <KEY> <VALUE>");
                 std::process::exit(1);
             }
-        },
+        }
         "-l" | "--list" => {
             let keys = wallet.get_keys();
             if keys.is_empty() {
@@ -36,7 +36,7 @@ fn main() {
                     println!("  • {}", key);
                 }
             }
-        },
+        }
         "-r" | "--remove" => {
             if cmd.args.len() >= 3 {
                 let key = cmd.args[2].clone().trim().to_string();
@@ -52,7 +52,7 @@ fn main() {
                 eprintln!("Usage: wallet -r <KEY>");
                 std::process::exit(1);
             }
-        },
+        }
         "-s" | "--show" => {
             if cmd.args.len() >= 3 {
                 let key = cmd.args[2].clone();
@@ -60,7 +60,7 @@ fn main() {
                     Some(value) => {
                         println!("{}:", key);
                         println!("{}", value);
-                    },
+                    }
                     None => {
                         eprintln!("Error: Key '{}' not found in wallet", key);
                         std::process::exit(1);
@@ -71,7 +71,7 @@ fn main() {
                 eprintln!("Usage: wallet -s <KEY>");
                 std::process::exit(1);
             }
-        },
+        }
         "-c" | "--copy" => {
             if cmd.args.len() >= 3 {
                 let key = cmd.args[2].clone();
@@ -87,10 +87,10 @@ fn main() {
                 eprintln!("Usage: wallet -c <KEY>");
                 std::process::exit(1);
             }
-        },
+        }
         "-h" | "--help" => {
             usage.show();
-        },
+        }
         _ => {
             eprintln!("Error: Unknown command '{}'", command);
             eprintln!("Use 'wallet --help' to see available commands");

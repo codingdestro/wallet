@@ -5,6 +5,7 @@ use std::{
 };
 
 pub mod clipboard;
+pub mod encrypt;
 
 pub struct Command {
     pub args: Vec<String>,
