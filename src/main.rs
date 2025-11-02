@@ -12,7 +12,6 @@ fn main() {
     }
 
     let command = &cmd.args[1];
-
     match command.as_str() {
         "-a" | "--add" => {
             if cmd.args.len() >= 4 {
