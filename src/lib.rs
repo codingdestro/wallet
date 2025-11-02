@@ -29,15 +29,28 @@ impl Wallet {
         let homepath = std::env::var("HOME").unwrap();
         Wallet {
             list,
-            file_path: String::from(format!("{}/wallet.txt", homepath)),
+            file_path: String::from(format!("{}/wallets.txt", homepath)),
         }
     }
 
-    pub fn load(&mut self) {
+    pub fn load(&mut self, password: &str) {
         let mut buf: Vec<u8> = Vec::new();
         if let Ok(mut file) = std::fs::File::options().read(true).open(&self.file_path) {
             file.read_to_end(&mut buf).expect("Failed to read file");
         }
+
+        let result = crypto::decrypt_file(&self.file_path, password);
+        match result {
+            Ok(decrypted_data) => {
+                buf = decrypted_data.into_bytes();
+            }
+            Err(_) => {
+                // If decryption fails, return with an error password and clear the wallet
+                eprintln!("Error: Incorrect password or corrupted wallet file");
+                std::process::exit(1);
+            }
+        }
+
         let buf = String::from_utf8(buf).unwrap();
         if !buf.is_empty() {
             for line in buf.lines() {
@@ -49,16 +62,20 @@ impl Wallet {
         }
     }
 
-    pub fn save(&mut self) {
+    pub fn save(&mut self, password: &str) {
         let mut file = std::fs::File::options()
             .create(true)
             .write(true)
             .truncate(true)
             .open(self.file_path.to_string())
             .expect("Failed to open file");
+
         for (key, value) in &self.list {
             writeln!(file, "{}:{}", key, value).expect("Failed to write to file");
         }
+
+        crypto::encrypt_file(&self.file_path, password, &self.file_path)
+            .expect("Failed to encrypt wallet file");
     }
 
     pub fn add(&mut self, key: String, value: String) {
@@ -93,11 +110,11 @@ impl Wallet {
             println!("{}", key);
         }
     }
-    
+
     pub fn get_keys(&self) -> Vec<String> {
         self.list.keys().cloned().collect()
     }
-    
+
     pub fn key_exists(&self, key: &str) -> bool {
         self.list.contains_key(key)
     }
@@ -138,7 +155,7 @@ impl Usage {
                 "wallet --add github-token ghp_xxxxxxxxxxxx".to_string(),
             ],
         });
-        
+
         usage.add_command(CommandHelp {
             flag: "-s, --show".to_string(),
             usage: "<KEY>".to_string(),
@@ -148,7 +165,7 @@ impl Usage {
                 "wallet --show github-token".to_string(),
             ],
         });
-        
+
         usage.add_command(CommandHelp {
             flag: "-c, --copy".to_string(),
             usage: "<KEY>".to_string(),
@@ -158,17 +175,14 @@ impl Usage {
                 "wallet --copy api-key".to_string(),
             ],
         });
-        
+
         usage.add_command(CommandHelp {
             flag: "-l, --list".to_string(),
             usage: "".to_string(),
             description: "List all available keys (values are hidden for security)".to_string(),
-            examples: vec![
-                "wallet -l".to_string(),
-                "wallet --list".to_string(),
-            ],
+            examples: vec!["wallet -l".to_string(), "wallet --list".to_string()],
         });
-        
+
         usage.add_command(CommandHelp {
             flag: "-r, --remove".to_string(),
             usage: "<KEY>".to_string(),
@@ -178,17 +192,14 @@ impl Usage {
                 "wallet --remove expired-token".to_string(),
             ],
         });
-        
+
         usage.add_command(CommandHelp {
             flag: "-h, --help".to_string(),
             usage: "".to_string(),
             description: "Show this help message".to_string(),
-            examples: vec![
-                "wallet -h".to_string(),
-                "wallet --help".to_string(),
-            ],
+            examples: vec!["wallet -h".to_string(), "wallet --help".to_string()],
         });
-        
+
         usage
     }
 
@@ -201,12 +212,12 @@ impl Usage {
         println!("{} v{}", self.program_name, self.version);
         println!("{}", self.description);
         println!();
-        
+
         // Usage
         println!("USAGE:");
         println!("    {} [OPTIONS] [ARGS...]", self.program_name);
         println!();
-        
+
         // Options
         println!("OPTIONS:");
         for cmd in &self.commands {
@@ -216,15 +227,16 @@ impl Usage {
             } else {
                 format!(" {}", cmd.usage)
             };
-            
-            println!("    {:<width$} {}", 
-                format!("{}{}", cmd.flag, usage_part), 
-                cmd.description, 
+
+            println!(
+                "    {:<width$} {}",
+                format!("{}{}", cmd.flag, usage_part),
+                cmd.description,
                 width = flag_width + cmd.usage.len()
             );
         }
         println!();
-        
+
         // Examples
         println!("EXAMPLES:");
         for cmd in &self.commands {
@@ -235,13 +247,13 @@ impl Usage {
             }
         }
         println!();
-        
+
         // Footer
         println!("STORAGE:");
         println!("    Data is stored in: ~/wallet.txt");
         println!("    Each line follows the format: key:value");
         println!();
-        
+
         println!("SECURITY NOTE:");
         println!("    This tool stores data in plain text. For sensitive data,");
         println!("    consider using additional encryption or a dedicated password manager.");

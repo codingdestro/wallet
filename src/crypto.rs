@@ -1,5 +1,6 @@
 use aes_gcm::{
-    Aes256Gcm, Nonce, aead::{Aead, KeyInit, OsRng, rand_core::RngCore}
+    Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit, OsRng, rand_core::RngCore},
 };
 use pbkdf2::pbkdf2_hmac;
 // use rand::RngCore;
@@ -47,7 +48,7 @@ pub fn encrypt_file<P: AsRef<Path>>(input: P, password: &str, output: P) -> io::
 }
 
 /// Decrypts the given file using the provided password.
-pub fn decrypt_file<P: AsRef<Path>>(input: P, password: &str, output: P) -> io::Result<()> {
+pub fn decrypt_file<P: AsRef<Path>>(input: P, password: &str) -> io::Result<(String)> {
     let data = fs::read(&input)?;
 
     if data.len() < SALT_LEN + NONCE_LEN {
@@ -69,6 +70,5 @@ pub fn decrypt_file<P: AsRef<Path>>(input: P, password: &str, output: P) -> io::
         .decrypt(nonce, ciphertext)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid password or data"))?;
 
-    fs::write(&output, plaintext)?;
-    Ok(())
+    Ok(plaintext.iter().map(|&c| c as char).collect())
 }

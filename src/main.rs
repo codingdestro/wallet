@@ -1,16 +1,24 @@
+use std::io;
+
 use wallet::*;
 
 fn main() {
     let cmd = Command::new();
     let usage = Usage::default();
     let mut wallet = Wallet::new();
-    wallet.load();
 
     if cmd.args.len() <= 1 {
         usage.show();
         return;
     }
 
+    let mut password: String = String::new();
+    io::stdin()
+        .read_line(&mut password)
+        .expect("Failed to read password");
+    let password = password.trim();
+
+    wallet.load(password);
     let command = &cmd.args[1];
     match command.as_str() {
         "-a" | "--add" => {
@@ -97,5 +105,5 @@ fn main() {
         }
     }
 
-    wallet.save();
+    wallet.save(password);
 }
