@@ -48,7 +48,7 @@ pub fn encrypt_file<P: AsRef<Path>>(input: P, password: &str, output: P) -> io::
 }
 
 /// Decrypts the given file using the provided password.
-pub fn decrypt_file<P: AsRef<Path>>(input: P, password: &str) -> io::Result<(String)> {
+pub fn decrypt_file<P: AsRef<Path>>(input: P, password: &str) -> io::Result<String> {
     let data = fs::read(&input)?;
 
     if data.len() < SALT_LEN + NONCE_LEN {

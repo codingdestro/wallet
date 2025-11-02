@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    env,
-    io::{Read, Write},
-};
+use std::{collections::HashMap, env, io::Write};
 
 pub mod clipboard;
 pub mod crypto;
@@ -29,20 +25,23 @@ impl Wallet {
         let homepath = std::env::var("HOME").unwrap();
         Wallet {
             list,
-            file_path: String::from(format!("{}/wallets.txt", homepath)),
+            file_path: String::from(format!("{}/wallet.txt", homepath)),
         }
     }
 
     pub fn load(&mut self, password: &str) {
-        let mut buf: Vec<u8> = Vec::new();
-        if let Ok(mut file) = std::fs::File::options().read(true).open(&self.file_path) {
-            file.read_to_end(&mut buf).expect("Failed to read file");
+        //check is file exists
+        if !std::path::Path::new(&self.file_path).exists() {
+            // If the file doesn't exist, initialize an empty wallet and return
+            self.list = HashMap::new();
+            self.save(password);
         }
 
+        let mut wallet_data: Vec<u8> = Vec::new();
         let result = crypto::decrypt_file(&self.file_path, password);
         match result {
             Ok(decrypted_data) => {
-                buf = decrypted_data.into_bytes();
+                wallet_data = decrypted_data.into_bytes();
             }
             Err(_) => {
                 // If decryption fails, return with an error password and clear the wallet
@@ -51,7 +50,7 @@ impl Wallet {
             }
         }
 
-        let buf = String::from_utf8(buf).unwrap();
+        let buf = String::from_utf8(wallet_data).unwrap();
         if !buf.is_empty() {
             for line in buf.lines() {
                 let parts: Vec<&str> = line.split(':').collect();

@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, Write};
 
 use wallet::*;
 
@@ -13,6 +13,8 @@ fn main() {
     }
 
     let mut password: String = String::new();
+    print!("Enter wallet password: ");
+    io::stdout().flush().expect("Failed to flush stdout");
     io::stdin()
         .read_line(&mut password)
         .expect("Failed to read password");
