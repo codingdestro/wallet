@@ -25,7 +25,7 @@ impl Wallet {
         let homepath = std::env::var("HOME").unwrap();
         Wallet {
             list,
-            file_path: String::from(format!("{}/wallet.txt", homepath)),
+            file_path: String::from(format!("{}/.local/share/wallet/wallet.dec", homepath)),
         }
     }
 
@@ -33,6 +33,11 @@ impl Wallet {
         //check is file exists
         if !std::path::Path::new(&self.file_path).exists() {
             // If the file doesn't exist, initialize an empty wallet and return
+            //create a folder if it doesn't exist
+            let parent_dir = std::path::Path::new(&self.file_path).parent().unwrap();
+            if !parent_dir.exists() {
+                std::fs::create_dir_all(parent_dir).expect("Failed to create directory");
+            }
             self.list = HashMap::new();
             self.save(password);
         }
