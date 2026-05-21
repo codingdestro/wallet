@@ -299,17 +299,17 @@ fn handle_entry_detail(app: &mut TuiApp, key: KeyCode) {
 fn handle_add_entry(app: &mut TuiApp, key: KeyCode) {
     match key {
         KeyCode::Tab => {
-            if app.add_value_visible {
-                app.add_value_visible = false;
-            } else {
-                app.add_value_visible = true;
-            }
+            app.add_value_visible = !app.add_value_visible;
         }
         KeyCode::Enter => {
             let key = app.add_key.trim().to_string();
             let value = app.add_value.trim().to_string();
-            if key.is_empty() || value.is_empty() {
-                app.error_message = Some("Both key and value are required".to_string());
+            if key.is_empty() {
+                app.error_message = Some("Key is required".to_string());
+                return;
+            }
+            if value.is_empty() {
+                app.error_message = Some("Value is required".to_string());
                 return;
             }
             app.wallet.add(key.clone(), value.clone());
@@ -594,7 +594,7 @@ fn draw_entry_detail(f: &mut Frame, app: &mut TuiApp) {
 fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
     let area = f.area();
 
-    let popup = centered_rect(50, 9, area);
+    let popup = centered_rect(50, 10, area);
     let clear = Clear;
     f.render_widget(clear, popup);
 
@@ -606,19 +606,22 @@ fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
         "\u{2022}".repeat(app.add_value.chars().count())
     };
 
-    // Highlight active field indicator
-    let key_indicator = if !app.add_value_visible { " ◀" } else { "" };
-    let value_indicator = if app.add_value_visible { " ◀" } else { "" };
+    let editing_key = !app.add_value_visible;
+    let editing_value = app.add_value_visible;
 
     let key_line = Line::from(vec![
-        Span::styled(" Key:  ", Style::default().fg(Color::Cyan)),
+        Span::styled(
+            if editing_key { "▸ Key: " } else { "  Key: " },
+            Style::default().fg(if editing_key { Color::Green } else { Color::Cyan }),
+        ),
         Span::raw(&key_display),
-        Span::styled(key_indicator, Style::default().fg(Color::Green).bold()),
     ]);
     let value_line = Line::from(vec![
-        Span::styled("Value: ", Style::default().fg(Color::Cyan)),
+        Span::styled(
+            if editing_value { "▸ Val: " } else { "  Val: " },
+            Style::default().fg(if editing_value { Color::Green } else { Color::Cyan }),
+        ),
         Span::raw(&value_display),
-        Span::styled(value_indicator, Style::default().fg(Color::Green).bold()),
     ]);
 
     let mut lines = vec![
@@ -629,7 +632,10 @@ fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
     ];
 
     if let Some(ref err) = app.error_message {
-        lines.push(Line::from(Span::styled(err, Style::default().fg(Color::Red))));
+        lines.push(Line::from(Span::styled(
+            format!("  {err}"),
+            Style::default().fg(Color::Red),
+        )));
     }
 
     lines.push(Line::from(""));
@@ -644,19 +650,20 @@ fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
                 .title(" New Entry ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Cyan)),
-        );
+        )
+        .wrap(ratatui::widgets::Wrap { trim: false });
 
     f.render_widget(inner, popup);
 
     // Cursor in the active field
-    let field_len = if !app.add_value_visible {
-        app.add_key.chars().count()
-    } else {
-        app.add_value.chars().count()
-    } as u16;
-    let cursor_x = popup.x + 7 + field_len;
-    // Line 3 = header (0) + blank (1) + key line (2) = y: 3
-    let cursor_y = popup.y + 3;
+    let field_text = if editing_key { &app.add_key } else { &app.add_value };
+    let cursor_offset = field_text.chars().count() as u16;
+    // The key label is "▸ Key: " (7 chars) or "  Key: " (7 chars)
+    // The val label is "▸ Val: " (7 chars) or "  Val: " (7 chars)
+    let cursor_x = popup.x + 8 + cursor_offset;
+    // key line = y: 3 (header 0 + blank 1 + key 2), val line = y: 4 (header 0 + blank 1 + key 2 + val 3)
+    let line_y = if editing_key { 3 } else { 4 };
+    let cursor_y = popup.y + line_y;
     f.set_cursor_position((cursor_x.min(popup.x + popup.width.saturating_sub(3)), cursor_y));
 }
 
