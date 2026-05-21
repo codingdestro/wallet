@@ -43,18 +43,14 @@ impl Wallet {
             self.save(password);
         }
 
-        let mut wallet_data: Vec<u8> = Vec::new();
-        let result = crypto::decrypt_file(&self.file_path, password);
-        match result {
-            Ok(decrypted_data) => {
-                wallet_data = decrypted_data.into_bytes();
-            }
+        let wallet_data: Vec<u8> = match crypto::decrypt_file(&self.file_path, password) {
+            Ok(decrypted_data) => decrypted_data.into_bytes(),
             Err(_) => {
                 // If decryption fails, return with an error password and clear the wallet
                 eprintln!("Error: Incorrect password or corrupted wallet file");
                 std::process::exit(1);
             }
-        }
+        };
 
         let buf = String::from_utf8(wallet_data).unwrap();
         if !buf.is_empty() {
