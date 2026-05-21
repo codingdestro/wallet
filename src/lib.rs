@@ -16,7 +16,7 @@ impl Wallet {
         let homepath = std::env::var("HOME").unwrap();
         Wallet {
             list,
-            file_path: String::from(format!("{}/.local/share/wallet/wallet.dec", homepath)),
+            file_path: format!("{}/.local/share/wallet/data.wallet", homepath),
         }
     }
 

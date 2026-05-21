@@ -21,8 +21,24 @@ cargo build --release
 ## Usage
 
 ```bash
-cargo run
+# Password will be prompted securely (hidden input)
+wallet add my-key my-value
+wallet list
+wallet show my-key
+wallet generate -l 32 -s
+
+# Or via environment variable for scripting:
+export WALLET_PASSWORD=my-secret
+wallet add api-key ghp_xxxx
 ```
+
+## Storage
+
+Data is encrypted with AES-256-GCM and stored at:
+```
+~/.local/share/wallet/data.wallet
+```
+The master password is derived into a 256-bit key via PBKDF2 (100,000 iterations).
 
 ## Testing
 
