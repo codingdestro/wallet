@@ -4,11 +4,13 @@ A Rust-based password management tool for securely storing and managing your cre
 
 ## Features
 
-- Secure password storage with encryption
-- Master password protection
-- Password generation
-- Credential management and organization
-- Cross-platform compatibility
+- 🔒 Secure password storage with AES-256-GCM encryption
+- 🔑 Master password protection with PBKDF2 key derivation
+- 🎲 Password generation (alphanumeric or with special characters)
+- 📋 Clipboard integration for easy copying
+- 🖥️ **Terminal UI** with interactive password management
+- ⌨️ **CLI mode** with subcommands for scripting
+- 📁 Credential management and organization
 
 ## Installation
 
@@ -20,17 +22,40 @@ cargo build --release
 
 ## Usage
 
+### CLI Mode (default)
+
 ```bash
 # Password will be prompted securely (hidden input)
 wallet add my-key my-value
 wallet list
 wallet show my-key
+wallet remove my-key
+wallet copy my-key
 wallet generate -l 32 -s
 
 # Or via environment variable for scripting:
 export WALLET_PASSWORD=my-secret
 wallet add api-key ghp_xxxx
 ```
+
+### TUI Mode (interactive)
+
+Run without arguments or with `--tui` / `-t`:
+
+```bash
+wallet           # auto-launches TUI
+wallet --tui     # explicit TUI mode
+```
+
+| Key | Action |
+|-----|--------|
+| `↑/↓` / `j/k` | Navigate entries |
+| `Enter` | View entry detail |
+| `a` | Add new entry |
+| `d` | Delete selected entry |
+| `c` | Copy value to clipboard |
+| `Tab` / `h` | Show/hide value |
+| `q` / `Esc` | Quit |
 
 ## Storage
 

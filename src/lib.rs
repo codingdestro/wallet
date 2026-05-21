@@ -4,6 +4,7 @@ use std::io::Write;
 pub mod cli;
 pub mod clipboard;
 pub mod crypto;
+pub mod tui;
 
 pub struct Wallet {
     list: HashMap<String, String>,
