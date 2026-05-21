@@ -70,5 +70,136 @@ pub fn decrypt_file<P: AsRef<Path>>(input: P, password: &str) -> io::Result<Stri
         .decrypt(nonce, ciphertext)
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "Invalid password or data"))?;
 
-    Ok(plaintext.iter().map(|&c| c as char).collect())
+    String::from_utf8(plaintext).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Decrypted data is not valid UTF-8: {e}"),
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let path = format!("/tmp/crypto-roundtrip-{}.enc", std::process::id());
+        let password = "test-password";
+        let original = "Hello, this is a secret message!";
+
+        // Write plaintext to input file
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(original.as_bytes()).unwrap();
+        }
+
+        // Encrypt
+        encrypt_file(&path, password, &path).unwrap();
+
+        // The file should now be encrypted
+        let data = std::fs::read(&path).unwrap();
+        assert_ne!(data, original.as_bytes(), "File should be encrypted");
+
+        // Decrypt
+        let decrypted = decrypt_file(&path, password).unwrap();
+        assert_eq!(decrypted, original);
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_decrypt_with_wrong_password_fails() {
+        let path = format!("/tmp/crypto-badpw-{}.enc", std::process::id());
+        let password = "correct-password";
+        let original = "sensitive data";
+
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(original.as_bytes()).unwrap();
+        }
+
+        encrypt_file(&path, password, &path).unwrap();
+
+        let result = decrypt_file(&path, "wrong-password");
+        assert!(result.is_err(), "Decrypting with wrong password should fail");
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_decrypt_corrupted_file_fails() {
+        let path = format!("/tmp/crypto-corrupt-{}.enc", std::process::id());
+
+        // Write garbage data
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(b"this is not encrypted data").unwrap();
+        }
+
+        let result = decrypt_file(&path, "any-password");
+        assert!(result.is_err(), "Decrypting corrupted data should fail");
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_decrypt_too_short_file_fails() {
+        let path = format!("/tmp/crypto-short-{}.enc", std::process::id());
+
+        // Write too-short data (less than salt + nonce)
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(b"short").unwrap();
+        }
+
+        let result = decrypt_file(&path, "password");
+        assert!(result.is_err(), "Decrypting a too-short file should fail");
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_encrypt_produces_unique_output() {
+        let path = format!("/tmp/crypto-unique-{}.enc", std::process::id());
+        let password = "password";
+        let original = "same content";
+
+        let mut results = Vec::new();
+
+        for _ in 0..3 {
+            {
+                let mut f = std::fs::File::create(&path).unwrap();
+                f.write_all(original.as_bytes()).unwrap();
+            }
+            encrypt_file(&path, password, &path).unwrap();
+            let data = std::fs::read(&path).unwrap();
+            results.push(data);
+        }
+
+        // Each encryption should produce different output (different salt + nonce)
+        assert!(results[0] != results[1] || results[1] != results[2],
+                "Each encryption should produce unique output");
+
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn test_decrypt_utf8_content() {
+        let path = format!("/tmp/crypto-utf8-{}.enc", std::process::id());
+        let password = "pässwörd";
+        let original = "Hello 你好 ñoño émoji🔥";
+
+        {
+            let mut f = std::fs::File::create(&path).unwrap();
+            f.write_all(original.as_bytes()).unwrap();
+        }
+
+        encrypt_file(&path, password, &path).unwrap();
+        let decrypted = decrypt_file(&path, password).unwrap();
+        assert_eq!(decrypted, original);
+
+        std::fs::remove_file(&path).ok();
+    }
 }
