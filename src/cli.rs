@@ -61,16 +61,22 @@ pub enum Command {
     },
 }
 
-/// Prompt the user for a password and return the trimmed result
+/// Prompt the user for a password (hidden input) and return the trimmed result
 pub fn prompt_password(prompt: &str) -> String {
-    use std::io::Write;
-    let mut password = String::new();
-    print!("{prompt}");
-    std::io::stdout().flush().expect("Failed to flush stdout");
-    std::io::stdin()
-        .read_line(&mut password)
-        .expect("Failed to read password");
-    password.trim().to_string()
+    rpassword::prompt_password(prompt)
+        .unwrap_or_else(|_| {
+            // Fallback to plain-text input if rpassword fails
+            use std::io::Write;
+            let mut password = String::new();
+            print!("{prompt}");
+            std::io::stdout().flush().expect("Failed to flush stdout");
+            std::io::stdin()
+                .read_line(&mut password)
+                .expect("Failed to read password");
+            password
+        })
+        .trim()
+        .to_string()
 }
 
 /// Run the CLI by parsing args and dispatching to the wallet
