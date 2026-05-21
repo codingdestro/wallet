@@ -442,18 +442,11 @@ fn draw_password_prompt(f: &mut Frame, app: &mut TuiApp) {
     let inner = chunks[1];
     f.render_widget(input, inner);
 
-    // Cursor for password input
-    if app.password_visible {
-        let cursor_x = inner.x + 1 + app.password_input.len() as u16;
-        let cursor_y = inner.y + 1;
-        f.set_cursor_position((cursor_x.min(inner.x + inner.width.saturating_sub(2)), cursor_y));
-    } else {
-        // Show cursor at end of bullet dots
-        let dots_len = app.password_input.chars().count() as u16;
-        let cursor_x = inner.x + 1 + dots_len;
-        let cursor_y = inner.y + 1;
-        f.set_cursor_position((cursor_x.min(inner.x + inner.width.saturating_sub(2)), cursor_y));
-    }
+    // Cursor for password input — always at end of content
+    let cursor_offset = app.password_input.chars().count() as u16;
+    let cursor_x = inner.x + 1 + cursor_offset;
+    let cursor_y = inner.y + 1;
+    f.set_cursor_position((cursor_x.min(inner.x + inner.width.saturating_sub(2)), cursor_y));
 
     let mut hints = vec![Line::from(Span::styled(
         "[Enter] submit  •  [Tab] toggle visibility  •  [Esc] quit",
@@ -493,7 +486,7 @@ fn draw_main(f: &mut Frame, app: &mut TuiApp) {
     .block(Block::default().borders(Borders::BOTTOM));
     f.render_widget(header, chunks[0]);
 
-    // Body: key-value table
+    // Body: key list with fixed-length value mask (security: don't reveal length)
     let body_area = chunks[1];
     if app.keys.is_empty() {
         let empty = Paragraph::new(Text::styled(
@@ -507,10 +500,7 @@ fn draw_main(f: &mut Frame, app: &mut TuiApp) {
             .keys
             .iter()
             .map(|k| {
-                let value = &app.wallet.get(k).unwrap();
-                let masked: String = std::iter::repeat('\u{2022}')
-                    .take(value.len().min(40))
-                    .collect();
+                let masked: String = std::iter::repeat('\u{2022}').take(8).collect();
                 ListItem::new(Line::from(vec![
                     Span::styled(k.clone(), Style::default().fg(Color::Cyan).bold()),
                     Span::raw("  "),
@@ -523,8 +513,8 @@ fn draw_main(f: &mut Frame, app: &mut TuiApp) {
             .block(Block::default().borders(Borders::NONE))
             .highlight_style(
                 Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
+                    .fg(Color::White)
+                    .bg(Color::Blue)
                     .add_modifier(Modifier::BOLD),
             )
             .highlight_symbol("▸ ");
@@ -532,9 +522,9 @@ fn draw_main(f: &mut Frame, app: &mut TuiApp) {
         f.render_stateful_widget(list, body_area, &mut app.list_state);
     }
 
-    // Footer
+    // Footer — height 1, no border
     let footer = Paragraph::new(Line::from(vec![
-        Span::styled(" [↑/↓/j/k] nav", Style::default().fg(Color::DarkGray)),
+        Span::styled(" [\u{2191}\u{2193}/j/k] nav", Style::default().fg(Color::DarkGray)),
         Span::raw("  "),
         Span::styled("[Enter] view", Style::default().fg(Color::DarkGray)),
         Span::raw("  "),
@@ -545,8 +535,7 @@ fn draw_main(f: &mut Frame, app: &mut TuiApp) {
         Span::styled("[c] copy", Style::default().fg(Color::DarkGray)),
         Span::raw("  "),
         Span::styled("[q] quit", Style::default().fg(Color::DarkGray)),
-    ]))
-    .block(Block::default().borders(Borders::TOP));
+    ]));
     f.render_widget(footer, chunks[2]);
 }
 
@@ -555,12 +544,9 @@ fn draw_main(f: &mut Frame, app: &mut TuiApp) {
 fn draw_entry_detail(f: &mut Frame, app: &mut TuiApp) {
     // Dimmed background
     let area = f.area();
-    let block = Block::default()
-        .style(Style::default().bg(Color::Black).fg(Color::DarkGray));
-    f.render_widget(block, area);
 
     // Popup
-    let popup = centered_rect(60, 8, area);
+    let popup = centered_rect(60, 10, area);
     let clear = Clear;
     f.render_widget(clear, popup);
 
@@ -575,7 +561,7 @@ fn draw_entry_detail(f: &mut Frame, app: &mut TuiApp) {
     let display_value = if app.show_value {
         value.clone()
     } else {
-        "\u{2022}".repeat(value.len().min(80))
+        "\u{2022}".repeat(8)
     };
 
     let key_span = Span::styled(key.clone(), Style::default().fg(Color::Cyan).bold());
@@ -597,7 +583,8 @@ fn draw_entry_detail(f: &mut Frame, app: &mut TuiApp) {
             .title(" Entry ")
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Cyan)),
-    );
+    )
+    .wrap(ratatui::widgets::Wrap { trim: false });
 
     f.render_widget(inner, popup);
 }
@@ -606,9 +593,6 @@ fn draw_entry_detail(f: &mut Frame, app: &mut TuiApp) {
 
 fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
     let area = f.area();
-    let block = Block::default()
-        .style(Style::default().bg(Color::Black).fg(Color::DarkGray));
-    f.render_widget(block, area);
 
     let popup = centered_rect(50, 9, area);
     let clear = Clear;
@@ -665,11 +649,13 @@ fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
     f.render_widget(inner, popup);
 
     // Cursor in the active field
-    let cursor_x = if !app.add_value_visible {
-        popup.x + 7 + app.add_key.len() as u16
+    let field_len = if !app.add_value_visible {
+        app.add_key.chars().count()
     } else {
-        popup.x + 7 + app.add_value.len() as u16
-    };
+        app.add_value.chars().count()
+    } as u16;
+    let cursor_x = popup.x + 7 + field_len;
+    // Line 3 = header (0) + blank (1) + key line (2) = y: 3
     let cursor_y = popup.y + 3;
     f.set_cursor_position((cursor_x.min(popup.x + popup.width.saturating_sub(3)), cursor_y));
 }
@@ -678,9 +664,6 @@ fn draw_add_entry(f: &mut Frame, app: &mut TuiApp) {
 
 fn draw_confirm_delete(f: &mut Frame, app: &mut TuiApp) {
     let area = f.area();
-    let block = Block::default()
-        .style(Style::default().bg(Color::Black).fg(Color::DarkGray));
-    f.render_widget(block, area);
 
     let popup = centered_rect(46, 7, area);
     let clear = Clear;
