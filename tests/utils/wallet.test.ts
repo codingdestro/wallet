@@ -17,6 +17,8 @@ mock.module("@clack/prompts", () => {
     isCancel: (val: any) => val === null,
     log: {
       error: () => {},
+      success: () => {},
+      info: () => {},
     },
     spinner: () => ({
       start: () => {},
@@ -35,7 +37,23 @@ mock.module("@clack/prompts", () => {
   };
 });
 
-import { ensureWalletExists, addWalletKey } from "../../src/utils/wallet.js";
+// Mock our custom clipboard utility to isolate clipboard operations in headless testing environments
+let clipboardContent = "";
+mock.module("../../src/utils/clipboard.js", () => {
+  return {
+    copyToClipboard: async (val: string) => {
+      clipboardContent = val;
+    }
+  };
+});
+
+import {
+  ensureWalletExists,
+  addWalletKey,
+  listWalletKeys,
+  copyWalletValue,
+  deleteWalletKey
+} from "../../src/utils/wallet.js";
 
 describe("Wallet Initialization & Key-Value Utilities", () => {
   const testWalletFile = "temp_test_wallet.enc";
@@ -112,6 +130,35 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
     const data = JSON.parse(rawContent);
     expect(data.entries["mykey"]).toBe("my-secret-value");
 
+    unlinkSync(decryptedTemp);
+  });
+
+  test("lists keys in the wallet successfully", async () => {
+    mockPasswordValue = "supersecret";
+    const result = await listWalletKeys(testWalletFile);
+    expect(result).toBe(true);
+  });
+
+  test("copies a key value to clipboard successfully", async () => {
+    mockPasswordValue = "supersecret";
+    clipboardContent = "";
+
+    const result = await copyWalletValue("mykey", testWalletFile);
+    expect(result).toBe(true);
+    expect(clipboardContent).toBe("my-secret-value");
+  });
+
+  test("deletes a key from the wallet successfully", async () => {
+    mockPasswordValue = "supersecret";
+    
+    const result = await deleteWalletKey("mykey", testWalletFile);
+    expect(result).toBe(true);
+
+    // Verify key is deleted
+    const decryptedTemp = "temp_dec_del_verify.json";
+    decryptFile(testWalletFile, decryptedTemp, "supersecret");
+    const data = JSON.parse(readFileSync(decryptedTemp, "utf-8"));
+    expect(data.entries["mykey"]).toBeUndefined();
     unlinkSync(decryptedTemp);
   });
 });

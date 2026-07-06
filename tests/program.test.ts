@@ -15,6 +15,8 @@ mock.module("@clack/prompts", () => {
     isCancel: (val: any) => val === null,
     log: {
       error: () => {},
+      success: () => {},
+      info: () => {},
     },
     spinner: () => ({
       start: () => {},
@@ -32,6 +34,15 @@ mock.module("@clack/prompts", () => {
   };
 });
 
+let clipboardContent = "";
+mock.module("../src/utils/clipboard.js", () => {
+  return {
+    copyToClipboard: async (val: string) => {
+      clipboardContent = val;
+    }
+  };
+});
+
 import { createProgram } from "../src/program.js";
 
 describe("CLI program integration", () => {
@@ -41,31 +52,45 @@ describe("CLI program integration", () => {
     try { unlinkSync(testWallet); } catch {}
   });
 
-  test("runs init and add commands via createProgram parse", async () => {
+  test("runs full CLI commands lifecycle (init, add, list, copy, delete)", async () => {
     try { unlinkSync(testWallet); } catch {}
 
     const program = createProgram();
 
-    // 1. Run init command
+    // 1. Init command
     mockPasswordValue = "supersecret";
     mockConfirmValue = "supersecret";
     await program.parseAsync(["node", "index.js", "init", "-f", testWallet]);
-
     expect(existsSync(testWallet)).toBe(true);
 
-    // 2. Run add command
-    mockPasswordValue = "supersecret"; // decryption password
-    mockKeyValue = "my-secret-key-value"; // value to store
-    
+    // 2. Add command
+    mockPasswordValue = "supersecret";
+    mockKeyValue = "my-secret-key-value";
     const programAdd = createProgram();
     await programAdd.parseAsync(["node", "index.js", "add", "mykey", "-f", testWallet]);
 
-    // 3. Verify content
+    // 3. List command
+    mockPasswordValue = "supersecret";
+    const programList = createProgram();
+    await programList.parseAsync(["node", "index.js", "list", "-f", testWallet]);
+
+    // 4. Copy command
+    mockPasswordValue = "supersecret";
+    clipboardContent = "";
+    const programCopy = createProgram();
+    await programCopy.parseAsync(["node", "index.js", "copy", "mykey", "-f", testWallet]);
+    expect(clipboardContent).toBe("my-secret-key-value");
+
+    // 5. Delete command
+    mockPasswordValue = "supersecret";
+    const programDelete = createProgram();
+    await programDelete.parseAsync(["node", "index.js", "delete", "mykey", "-f", testWallet]);
+
+    // Verify it is gone
     const decryptedTemp = "temp_cli_dec.json";
     decryptFile(testWallet, decryptedTemp, "supersecret");
     const data = JSON.parse(readFileSync(decryptedTemp, "utf-8"));
-    expect(data.entries["mykey"]).toBe("my-secret-key-value");
-
+    expect(data.entries["mykey"]).toBeUndefined();
     unlinkSync(decryptedTemp);
   });
 });
