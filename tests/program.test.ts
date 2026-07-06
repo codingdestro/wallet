@@ -1,36 +1,23 @@
 import { expect, test, describe, afterAll, mock } from "bun:test";
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from "fs";
-import { decryptFile } from "../src/utils/crypto.js";
+import { decryptBuffer } from "../src/utils/crypto.js";
 
 // Control prompt inputs
 let mockPasswordValue: string | null = "my-password";
 let mockConfirmValue: string | null = "my-password";
 let mockKeyValue: string | null = "my-value";
 
-mock.module("@clack/prompts", () => {
+mock.module("../src/utils/prompts.js", () => {
   return {
-    intro: () => {},
-    outro: () => {},
-    cancel: () => {},
-    isCancel: (val: any) => val === null,
-    log: {
-      error: () => {},
-      success: () => {},
-      info: () => {},
-    },
-    spinner: () => ({
-      start: () => {},
-      stop: () => {},
-    }),
-    password: async ({ message }: any) => {
-      if (message.includes("Confirm")) {
+    promptPassword: async (query: string) => {
+      if (query.includes("Confirm")) {
         return mockConfirmValue;
       }
-      if (message.includes("value for key")) {
+      if (query.includes("value for key")) {
         return mockKeyValue;
       }
       return mockPasswordValue;
-    },
+    }
   };
 });
 
@@ -86,11 +73,10 @@ describe("CLI program integration", () => {
     const programDelete = createProgram();
     await programDelete.parseAsync(["node", "index.js", "delete", "mykey", "-f", testWallet]);
 
-    // Verify it is gone
-    const decryptedTemp = "temp_cli_dec.json";
-    decryptFile(testWallet, decryptedTemp, "supersecret");
-    const data = JSON.parse(readFileSync(decryptedTemp, "utf-8"));
+    // Verify it is gone in-memory
+    const encrypted = readFileSync(testWallet);
+    const decrypted = decryptBuffer(encrypted, "supersecret");
+    const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBeUndefined();
-    unlinkSync(decryptedTemp);
   });
 });

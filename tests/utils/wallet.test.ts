@@ -1,6 +1,6 @@
 import { expect, test, describe, afterAll, mock } from "bun:test";
 import { existsSync, unlinkSync, readFileSync } from "fs";
-import { decryptFile } from "../../src/utils/crypto.js";
+import { decryptBuffer } from "../../src/utils/crypto.js";
 
 // Variables to control mock prompt behavior in tests
 let mockPasswordValue: string | null = "my-password";
@@ -8,32 +8,19 @@ let mockConfirmValue: string | null = "my-password";
 let mockKeyValue: string | null = "my-value";
 let promptCallCount = 0;
 
-// Use mock.module in Bun to mock the external package @clack/prompts
-mock.module("@clack/prompts", () => {
+// Mock the local prompts utility module
+mock.module("../../src/utils/prompts.js", () => {
   return {
-    intro: () => {},
-    outro: () => {},
-    cancel: () => {},
-    isCancel: (val: any) => val === null,
-    log: {
-      error: () => {},
-      success: () => {},
-      info: () => {},
-    },
-    spinner: () => ({
-      start: () => {},
-      stop: () => {},
-    }),
-    password: async ({ message }: any) => {
+    promptPassword: async (query: string) => {
       promptCallCount++;
-      if (message.includes("Confirm")) {
+      if (query.includes("Confirm")) {
         return mockConfirmValue;
       }
-      if (message.includes("value for key")) {
+      if (query.includes("value for key")) {
         return mockKeyValue;
       }
       return mockPasswordValue;
-    },
+    }
   };
 });
 
@@ -76,11 +63,10 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
     expect(promptCallCount).toBe(2); // One for creation prompt, one for confirmation prompt
 
     // Verify it was encrypted with the correct password by decrypting it
-    const decryptedTemp = "temp_decrypted_wallet.json";
     expect(() => {
-      decryptFile(testWalletFile, decryptedTemp, "supersecret");
+      const encrypted = readFileSync(testWalletFile);
+      decryptBuffer(encrypted, "supersecret");
     }).not.toThrow();
-    try { unlinkSync(decryptedTemp); } catch {}
   });
 
   test("returns true immediately if file exists", async () => {
@@ -123,14 +109,11 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
 
     expect(result).toBe(true);
 
-    // Verify the entry was written by decrypting and checking JSON entries record
-    const decryptedTemp = "temp_dec_verify.json";
-    decryptFile(testWalletFile, decryptedTemp, "supersecret");
-    const rawContent = readFileSync(decryptedTemp, "utf-8");
-    const data = JSON.parse(rawContent);
+    // Verify the entry was written by decrypting in-memory and checking JSON entries record
+    const encrypted = readFileSync(testWalletFile);
+    const decrypted = decryptBuffer(encrypted, "supersecret");
+    const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBe("my-secret-value");
-
-    unlinkSync(decryptedTemp);
   });
 
   test("lists keys in the wallet successfully", async () => {
@@ -154,11 +137,10 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
     const result = await deleteWalletKey("mykey", testWalletFile);
     expect(result).toBe(true);
 
-    // Verify key is deleted
-    const decryptedTemp = "temp_dec_del_verify.json";
-    decryptFile(testWalletFile, decryptedTemp, "supersecret");
-    const data = JSON.parse(readFileSync(decryptedTemp, "utf-8"));
+    // Verify key is deleted in-memory
+    const encrypted = readFileSync(testWalletFile);
+    const decrypted = decryptBuffer(encrypted, "supersecret");
+    const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBeUndefined();
-    unlinkSync(decryptedTemp);
   });
 });

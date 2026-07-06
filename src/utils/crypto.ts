@@ -4,25 +4,19 @@ import {
   createCipheriv,
   createDecipheriv,
 } from "crypto";
-import { readFileSync, writeFileSync } from "fs";
 
 const ALGORITHM = "aes-256-gcm";
 
 /**
- * Encrypts a file using AES-256-GCM.
- * Layout of the output file: [salt (16 bytes)][iv (12 bytes)][tag (16 bytes)][encrypted data]
+ * Encrypts a Buffer using AES-256-GCM in memory.
+ * Layout of the output Buffer: [salt (16 bytes)][iv (12 bytes)][tag (16 bytes)][encrypted data]
  */
-export function encryptFile(
-  input: string,
-  output: string,
-  password: string
-) {
+export function encryptBuffer(data: Buffer, password: string): Buffer {
   const salt = randomBytes(16);
   const iv = randomBytes(12);
 
   const key = scryptSync(password, salt, 32);
   const cipher = createCipheriv(ALGORITHM, key, iv);
-  const data = readFileSync(input);
 
   const encrypted = Buffer.concat([
     cipher.update(data),
@@ -31,39 +25,29 @@ export function encryptFile(
 
   const authTag = cipher.getAuthTag();
 
-  const file = Buffer.concat([
+  return Buffer.concat([
     salt,
     iv,
     authTag,
     encrypted,
   ]);
-
-  writeFileSync(output, file);
 }
 
 /**
- * Decrypts a file encrypted with encryptFile.
+ * Decrypts a Buffer in memory encrypted with encryptBuffer.
  */
-export function decryptFile(
-  input: string,
-  output: string,
-  password: string
-) {
-  const file = readFileSync(input);
-
-  const salt = file.subarray(0, 16);
-  const iv = file.subarray(16, 28);
-  const authTag = file.subarray(28, 44);
-  const encrypted = file.subarray(44);
+export function decryptBuffer(encryptedBuffer: Buffer, password: string): Buffer {
+  const salt = encryptedBuffer.subarray(0, 16);
+  const iv = encryptedBuffer.subarray(16, 28);
+  const authTag = encryptedBuffer.subarray(28, 44);
+  const encrypted = encryptedBuffer.subarray(44);
 
   const key = scryptSync(password, salt, 32);
   const decipher = createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(authTag);
 
-  const decrypted = Buffer.concat([
+  return Buffer.concat([
     decipher.update(encrypted),
     decipher.final(),
   ]);
-
-  writeFileSync(output, decrypted);
 }
