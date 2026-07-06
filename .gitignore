@@ -1,5 +1,5 @@
 /target
-wallet.txt
+wallet*
 node_modules
 dist
 *.log
