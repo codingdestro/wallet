@@ -1,0 +1,36 @@
+{
+  "name": "wallet-cli",
+  "version": "0.1.0",
+  "description": "A Node.js CLI wallet tool template",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "wallet": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "bun test",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "cli",
+    "wallet",
+    "tool"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@clack/prompts": "^1.7.0",
+    "commander": "^12.1.0",
+    "picocolors": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "tsup": "^8.1.0",
+    "typescript": "^5.5.2"
+  }
+}
