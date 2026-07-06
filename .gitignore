@@ -1,2 +1,6 @@
 /target
 wallet.txt
+node_modules
+dist
+*.log
+.bun
