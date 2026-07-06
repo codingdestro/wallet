@@ -8,32 +8,19 @@ let mockConfirmValue: string | null = "my-password";
 let mockKeyValue: string | null = "my-value";
 let promptCallCount = 0;
 
-// Use mock.module in Bun to mock the external package @clack/prompts
-mock.module("@clack/prompts", () => {
+// Mock the local prompts utility module
+mock.module("../../src/utils/prompts.js", () => {
   return {
-    intro: () => {},
-    outro: () => {},
-    cancel: () => {},
-    isCancel: (val: any) => val === null,
-    log: {
-      error: () => {},
-      success: () => {},
-      info: () => {},
-    },
-    spinner: () => ({
-      start: () => {},
-      stop: () => {},
-    }),
-    password: async ({ message }: any) => {
+    promptPassword: async (query: string) => {
       promptCallCount++;
-      if (message.includes("Confirm")) {
+      if (query.includes("Confirm")) {
         return mockConfirmValue;
       }
-      if (message.includes("value for key")) {
+      if (query.includes("value for key")) {
         return mockKeyValue;
       }
       return mockPasswordValue;
-    },
+    }
   };
 });
 
