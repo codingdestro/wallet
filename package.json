@@ -1,5 +1,5 @@
 {
-  "name": "wallet-cli",
+  "name": "@codingdestro/wallet",
   "version": "0.1.0",
   "description": "A Node.js CLI wallet tool template",
   "type": "module",
@@ -19,9 +19,10 @@
   "keywords": [
     "cli",
     "wallet",
-    "tool"
+    "tool",
+    "secrect manager"
   ],
-  "author": "",
+  "author": "codingdestro",
   "license": "ISC",
   "dependencies": {
     "commander": "^12.1.0",

@@ -1,3 +1,4 @@
-import { createProgram } from './program.js';
+//#! /bin/node
+import { createProgram } from "./program.js";
 
 createProgram().parse(process.argv);
