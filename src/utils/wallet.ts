@@ -10,7 +10,7 @@ import pc from 'picocolors';
  * @param walletPath Path to the wallet file (default: 'wallet.enc')
  * @returns boolean indicating if the wallet file exists or was successfully created
  */
-export async function ensureWalletExists(walletPath = 'wallet.enc'): Promise<boolean> {
+export async function ensureWalletExists(walletPath: string): Promise<boolean> {
   if (existsSync(walletPath)) {
     return true;
   }
@@ -84,7 +84,6 @@ export async function ensureWalletExists(walletPath = 'wallet.enc'): Promise<boo
     writeFileSync(walletPath, encrypted);
 
     console.log(pc.green('Wallet initialized successfully.'));
-    console.log(pc.green(`Created encrypted wallet file: ${walletPath}`));
     return true;
   } catch (err: any) {
     console.error(pc.red(`Wallet initialization failed: ${err.message}`));
@@ -98,7 +97,7 @@ export async function ensureWalletExists(walletPath = 'wallet.enc'): Promise<boo
  * @param key The key to add/modify
  * @param walletPath Path to the wallet file (default: 'wallet.enc')
  */
-export async function addWalletKey(key: string, walletPath = 'wallet.enc'): Promise<boolean> {
+export async function addWalletKey(key: string, walletPath: string): Promise<boolean> {
   const exists = await ensureWalletExists(walletPath);
   if (!exists) {
     return false;
@@ -151,7 +150,6 @@ export async function addWalletKey(key: string, walletPath = 'wallet.enc'): Prom
     const encrypted = encryptBuffer(buffer, password);
     writeFileSync(walletPath, encrypted);
 
-    console.log(pc.green(`Successfully added key "${key}" to ${walletPath}.`));
     return true;
   } catch (err: any) {
     console.error(pc.red(`Failed to save wallet: ${err.message}`));
@@ -163,10 +161,10 @@ export async function addWalletKey(key: string, walletPath = 'wallet.enc'): Prom
  * Prompts user to decrypt the wallet, and lists all keys stored in it.
  * @param walletPath Path to the wallet file (default: 'wallet.enc')
  */
-export async function listWalletKeys(walletPath = 'wallet.enc'): Promise<boolean> {
+export async function listWalletKeys(walletPath: string): Promise<boolean> {
   const exists = existsSync(walletPath);
   if (!exists) {
-    console.error(pc.red(`Wallet file "${walletPath}" does not exist.`));
+    console.error(pc.red(`Wallet does not exist.`));
     return false;
   }
 
@@ -211,7 +209,7 @@ export async function listWalletKeys(walletPath = 'wallet.enc'): Promise<boolean
  * @param key The key to copy
  * @param walletPath Path to the wallet file (default: 'wallet.enc')
  */
-export async function copyWalletValue(key: string, walletPath = 'wallet.enc'): Promise<boolean> {
+export async function copyWalletValue(key: string, walletPath: string): Promise<boolean> {
   const exists = existsSync(walletPath);
   if (!exists) {
     console.error(pc.red(`Wallet file "${walletPath}" does not exist.`));
@@ -264,10 +262,10 @@ export async function copyWalletValue(key: string, walletPath = 'wallet.enc'): P
  * @param key The key to delete
  * @param walletPath Path to the wallet file (default: 'wallet.enc')
  */
-export async function deleteWalletKey(key: string, walletPath = 'wallet.enc'): Promise<boolean> {
+export async function deleteWalletKey(key: string, walletPath: string): Promise<boolean> {
   const exists = existsSync(walletPath);
   if (!exists) {
-    console.error(pc.red(`Wallet file "${walletPath}" does not exist.`));
+    console.error(pc.red(`Wallet does not exist.`));
     return false;
   }
 
@@ -310,7 +308,6 @@ export async function deleteWalletKey(key: string, walletPath = 'wallet.enc'): P
     const encrypted = encryptBuffer(buffer, password);
     writeFileSync(walletPath, encrypted);
 
-    console.log(pc.green(`Successfully deleted key "${key}" from ${walletPath}.`));
     return true;
   } catch (err: any) {
     console.error(pc.red(`Failed to save wallet: ${err.message}`));

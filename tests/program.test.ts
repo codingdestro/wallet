@@ -31,16 +31,17 @@ mock.module("../src/utils/clipboard.js", () => {
 });
 
 import { createProgram } from "../src/program.js";
+import { userPath } from "../src/utils/userpath.js";
 
 describe("CLI program integration", () => {
-  const testWallet = "temp_cli_wallet.enc";
+  const testWallet = userPath("default");
 
   afterAll(() => {
-    try { unlinkSync(testWallet); } catch {}
+    try { unlinkSync(testWallet); } catch { }
   });
 
   test("runs full CLI commands lifecycle (init, add, list, copy, delete)", async () => {
-    try { unlinkSync(testWallet); } catch {}
+    try { unlinkSync(testWallet); } catch { }
 
     const program = createProgram();
 

@@ -41,23 +41,24 @@ import {
   copyWalletValue,
   deleteWalletKey
 } from "../../src/utils/wallet.js";
+import { userPath } from "../../src/utils/userpath.js";
 
 describe("Wallet Initialization & Key-Value Utilities", () => {
-  const testWalletFile = "temp_test_wallet.enc";
+  const testWalletFile = userPath("default");
 
   afterAll(() => {
-    try { unlinkSync(testWalletFile); } catch {}
+    try { unlinkSync(testWalletFile); } catch { }
   });
 
   test("creates wallet.enc if it does not exist", async () => {
-    try { unlinkSync(testWalletFile); } catch {}
-    
+    try { unlinkSync(testWalletFile); } catch { }
+
     mockPasswordValue = "supersecret";
     mockConfirmValue = "supersecret";
     promptCallCount = 0;
 
     const result = await ensureWalletExists(testWalletFile);
-    
+
     expect(result).toBe(true);
     expect(existsSync(testWalletFile)).toBe(true);
     expect(promptCallCount).toBe(2); // One for creation prompt, one for confirmation prompt
@@ -74,26 +75,26 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
     promptCallCount = 0;
 
     const result = await ensureWalletExists(testWalletFile);
-    
+
     expect(result).toBe(true);
     expect(promptCallCount).toBe(0); // Should not prompt at all
   });
 
   test("returns false and cancels if password input is cancelled", async () => {
     const cancelWalletFile = "temp_cancel_wallet.enc";
-    try { unlinkSync(cancelWalletFile); } catch {}
+    try { unlinkSync(cancelWalletFile); } catch { }
 
     mockPasswordValue = null; // simulate cancellation
     mockConfirmValue = "any";
 
     const result = await ensureWalletExists(cancelWalletFile);
-    
+
     expect(result).toBe(false);
     expect(existsSync(cancelWalletFile)).toBe(false);
   });
 
   test("adds a key-value pair successfully to an existing wallet", async () => {
-    try { unlinkSync(testWalletFile); } catch {}
+    try { unlinkSync(testWalletFile); } catch { }
 
     // Initialize the wallet
     mockPasswordValue = "supersecret";
@@ -133,7 +134,7 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
 
   test("deletes a key from the wallet successfully", async () => {
     mockPasswordValue = "supersecret";
-    
+
     const result = await deleteWalletKey("mykey", testWalletFile);
     expect(result).toBe(true);
 

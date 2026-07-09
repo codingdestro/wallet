@@ -1,6 +1,6 @@
 {
   "name": "@codingdestro/wallet",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A Node.js CLI wallet tool template",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,6 +25,7 @@
   "author": "codingdestro",
   "license": "ISC",
   "dependencies": {
+    "@types/bun": "^1.3.14",
     "commander": "^12.1.0",
     "picocolors": "^1.0.1"
   },

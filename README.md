@@ -68,5 +68,3 @@ Requires Node.js 20+, TypeScript, and tsup (included as dev deps). Tests use [Bu
 - Random 12-byte IV per encryption
 - Secrets decrypted in memory only
 - Zero plaintext written to disk
-
-Only two runtime dependencies: `commander` (CLI parsing) and `picocolors` (terminal colors). Crypto, clipboard, and password prompts use Node.js built-in modules.
