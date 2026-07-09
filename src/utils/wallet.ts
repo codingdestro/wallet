@@ -2,6 +2,7 @@ import { existsSync, writeFileSync, readFileSync } from 'fs';
 import { encryptBuffer, decryptBuffer } from './crypto.js';
 import { promptPassword } from './prompts.js';
 import { copyToClipboard } from './clipboard.js';
+import { logger } from './logger.js';
 import pc from 'picocolors';
 
 /**
@@ -15,7 +16,7 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
     return true;
   }
 
-  console.log(pc.bold(pc.cyan('\n=== Wallet Initializer ===')));
+  logger.header('\nwallet init');
 
   let password = '';
   let confirmedPassword = '';
@@ -24,17 +25,17 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
     let cancelled = false;
 
     while (true) {
-      const pwd = await promptPassword(pc.cyan('Create a password for your wallet: '));
+      const pwd = await promptPassword(pc.cyan('password: '));
       if (pwd === null) {
         cancelled = true;
         break;
       }
       if (!pwd) {
-        console.log(pc.red('Password cannot be empty.'));
+        logger.error('empty');
         continue;
       }
       if (pwd.length < 4) {
-        console.log(pc.red('Password must be at least 4 characters.'));
+        logger.error('min 4 chars');
         continue;
       }
       password = pwd;
@@ -42,18 +43,18 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
     }
 
     if (cancelled) {
-      console.log(pc.yellow('Wallet initialization cancelled.'));
+      logger.warn('cancelled');
       return false;
     }
 
     while (true) {
-      const confirmPwd = await promptPassword(pc.cyan('Confirm your password: '));
+      const confirmPwd = await promptPassword(pc.cyan('confirm: '));
       if (confirmPwd === null) {
         cancelled = true;
         break;
       }
       if (!confirmPwd) {
-        console.log(pc.red('Confirmation password cannot be empty.'));
+        logger.error('empty');
         continue;
       }
       confirmedPassword = confirmPwd;
@@ -61,18 +62,18 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
     }
 
     if (cancelled) {
-      console.log(pc.yellow('Wallet initialization cancelled.'));
+      logger.warn('cancelled');
       return false;
     }
 
     if (password === confirmedPassword) {
       break;
     } else {
-      console.log(pc.red('Passwords do not match. Please try again.\n'));
+      logger.error('mismatch\n');
     }
   }
 
-  console.log(pc.yellow('Initializing wallet file...'));
+  logger.status('initializing');
 
   try {
     // Construct default empty wallet in memory
@@ -83,10 +84,10 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
     const encrypted = encryptBuffer(buffer, password);
     writeFileSync(walletPath, encrypted);
 
-    console.log(pc.green('Wallet initialized successfully.'));
+    logger.success('initialized');
     return true;
   } catch (err: any) {
-    console.error(pc.red(`Wallet initialization failed: ${err.message}`));
+    logger.error(`init failed: ${err.message}`);
     return false;
   }
 }
@@ -103,13 +104,13 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
     return false;
   }
 
-  const password = await promptPassword(pc.cyan('Enter wallet password to decrypt: '));
+  const password = await promptPassword(pc.cyan('password: '));
   if (password === null) {
-    console.log(pc.yellow('Cancelled.'));
+    logger.warn('cancelled');
     return false;
   }
   if (!password) {
-    console.error(pc.red('Password cannot be empty.'));
+    logger.error('empty');
     return false;
   }
 
@@ -122,17 +123,17 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
     const rawContent = decrypted.toString('utf-8');
     walletData = JSON.parse(rawContent);
   } catch (err) {
-    console.error(pc.red('Incorrect password or corrupted wallet file.'));
+    logger.error('bad password or corrupted wallet');
     return false;
   }
 
-  const value = await promptPassword(pc.cyan(`Enter value for key "${key}": `));
+  const value = await promptPassword(pc.cyan(`value for "${key}": `));
   if (value === null) {
-    console.log(pc.yellow('Cancelled.'));
+    logger.warn('cancelled');
     return false;
   }
   if (!value) {
-    console.error(pc.red('Value cannot be empty.'));
+    logger.error('empty value');
     return false;
   }
 
@@ -142,7 +143,7 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
   }
   walletData.entries[key] = value;
 
-  console.log(pc.yellow('Saving wallet...'));
+  logger.status('saving');
 
   try {
     // Serialize, encrypt in memory and write directly to disk
@@ -152,7 +153,7 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
 
     return true;
   } catch (err: any) {
-    console.error(pc.red(`Failed to save wallet: ${err.message}`));
+    logger.error(`save failed: ${err.message}`);
     return false;
   }
 }
@@ -164,17 +165,17 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
 export async function listWalletKeys(walletPath: string): Promise<boolean> {
   const exists = existsSync(walletPath);
   if (!exists) {
-    console.error(pc.red(`Wallet does not exist.`));
+    logger.error('not found');
     return false;
   }
 
-  const password = await promptPassword(pc.cyan('Enter wallet password to decrypt: '));
+  const password = await promptPassword(pc.cyan('password: '));
   if (password === null) {
-    console.log(pc.yellow('Cancelled.'));
+    logger.warn('cancelled');
     return false;
   }
   if (!password) {
-    console.error(pc.red('Password cannot be empty.'));
+    logger.error('empty');
     return false;
   }
 
@@ -187,16 +188,16 @@ export async function listWalletKeys(walletPath: string): Promise<boolean> {
     const rawContent = decrypted.toString('utf-8');
     walletData = JSON.parse(rawContent);
   } catch (err) {
-    console.error(pc.red('Incorrect password or corrupted wallet file.'));
+    logger.error('bad password or corrupted wallet');
     return false;
   }
 
   const keys = Object.keys(walletData.entries || {});
   if (keys.length === 0) {
-    console.log(pc.yellow('No keys found in wallet.'));
+    logger.warn('empty');
   } else {
     for (const key of keys) {
-      console.log(key);
+      logger.item(key);
     }
   }
 
@@ -212,17 +213,17 @@ export async function listWalletKeys(walletPath: string): Promise<boolean> {
 export async function copyWalletValue(key: string, walletPath: string): Promise<boolean> {
   const exists = existsSync(walletPath);
   if (!exists) {
-    console.error(pc.red(`Wallet file "${walletPath}" does not exist.`));
+    logger.error(`not found: ${walletPath}`);
     return false;
   }
 
-  const password = await promptPassword(pc.cyan('Enter wallet password to decrypt: '));
+  const password = await promptPassword(pc.cyan('password: '));
   if (password === null) {
-    console.log(pc.yellow('Cancelled.'));
+    logger.warn('cancelled');
     return false;
   }
   if (!password) {
-    console.error(pc.red('Password cannot be empty.'));
+    logger.error('empty');
     return false;
   }
 
@@ -235,23 +236,23 @@ export async function copyWalletValue(key: string, walletPath: string): Promise<
     const rawContent = decrypted.toString('utf-8');
     walletData = JSON.parse(rawContent);
   } catch (err) {
-    console.error(pc.red('Incorrect password or corrupted wallet file.'));
+    logger.error('bad password or corrupted wallet');
     return false;
   }
 
   const entries = walletData.entries || {};
   if (!(key in entries)) {
-    console.error(pc.red(`Key "${key}" not found in wallet.`));
+    logger.error(`key not found: ${key}`);
     return false;
   }
 
   try {
     // Zero-dependency native copy utility
     await copyToClipboard(entries[key]);
-    console.log(pc.green(`Copied value of "${key}" to clipboard.`));
+    logger.success(`copied: ${key}`);
     return true;
   } catch (err: any) {
-    console.error(pc.red(`Failed to copy to clipboard: ${err.message}`));
+    logger.error(`clipboard: ${err.message}`);
     return false;
   }
 }
@@ -265,17 +266,17 @@ export async function copyWalletValue(key: string, walletPath: string): Promise<
 export async function deleteWalletKey(key: string, walletPath: string): Promise<boolean> {
   const exists = existsSync(walletPath);
   if (!exists) {
-    console.error(pc.red(`Wallet does not exist.`));
+    logger.error('not found');
     return false;
   }
 
-  const password = await promptPassword(pc.cyan('Enter wallet password to decrypt: '));
+  const password = await promptPassword(pc.cyan('password: '));
   if (password === null) {
-    console.log(pc.yellow('Cancelled.'));
+    logger.warn('cancelled');
     return false;
   }
   if (!password) {
-    console.error(pc.red('Password cannot be empty.'));
+    logger.error('empty');
     return false;
   }
 
@@ -288,19 +289,19 @@ export async function deleteWalletKey(key: string, walletPath: string): Promise<
     const rawContent = decrypted.toString('utf-8');
     walletData = JSON.parse(rawContent);
   } catch (err) {
-    console.error(pc.red('Incorrect password or corrupted wallet file.'));
+    logger.error('bad password or corrupted wallet');
     return false;
   }
 
   const entries = walletData.entries || {};
   if (!(key in entries)) {
-    console.error(pc.red(`Key "${key}" not found in wallet.`));
+    logger.error(`key not found: ${key}`);
     return false;
   }
 
   delete entries[key];
 
-  console.log(pc.yellow('Saving wallet...'));
+  logger.status('saving');
 
   try {
     // Serialize, encrypt in memory and write directly to disk
@@ -310,7 +311,7 @@ export async function deleteWalletKey(key: string, walletPath: string): Promise<
 
     return true;
   } catch (err: any) {
-    console.error(pc.red(`Failed to save wallet: ${err.message}`));
+    logger.error(`save failed: ${err.message}`);
     return false;
   }
 }
