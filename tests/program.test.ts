@@ -10,10 +10,10 @@ let mockKeyValue: string | null = "my-value";
 mock.module("../src/utils/prompts.js", () => {
   return {
     promptPassword: async (query: string) => {
-      if (query.includes("Confirm")) {
+      if (query.includes("confirm")) {
         return mockConfirmValue;
       }
-      if (query.includes("value for key")) {
+      if (query.includes("value for")) {
         return mockKeyValue;
       }
       return mockPasswordValue;
