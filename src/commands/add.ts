@@ -1,5 +1,6 @@
 import { Command } from 'commander';
 import { addWalletKey } from '../utils/wallet.js';
+import { userPath } from '../utils/userpath.js';
 
 export function registerAddCommand(program: Command) {
   program
@@ -7,8 +8,8 @@ export function registerAddCommand(program: Command) {
     .alias('a')
     .description('Add a key-value pair to the wallet')
     .argument('<key>', 'The key to add')
-    .option('-f, --file <path>', 'Custom path for the wallet file', 'wallet.enc')
+    .option('-f, --file <path>', 'Custom path for the wallet file', 'default')
     .action(async (key, options) => {
-      await addWalletKey(key, options.file);
+      await addWalletKey(key, userPath(options.file));
     });
 }
