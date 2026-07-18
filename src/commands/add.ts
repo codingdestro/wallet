@@ -10,6 +10,11 @@ export function registerAddCommand(program: Command) {
     .argument('<key>', 'The key to add')
     .option('-f, --file <path>', 'Custom path for the wallet file', 'default')
     .action(async (key, options) => {
-      await addWalletKey(key, userPath(options.file));
+      try {
+        await addWalletKey(key, userPath(options.file));
+      } catch (err: any) {
+        process.stderr.write(`error: ${err.message}\n`);
+        process.exit(1);
+      }
     });
 }

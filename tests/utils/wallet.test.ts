@@ -53,20 +53,20 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
   test("creates wallet.enc if it does not exist", async () => {
     try { unlinkSync(testWalletFile); } catch { }
 
-    mockPasswordValue = "supersecret";
-    mockConfirmValue = "supersecret";
+    mockPasswordValue = "supersecret12";
+    mockConfirmValue = "supersecret12";
     promptCallCount = 0;
 
     const result = await ensureWalletExists(testWalletFile);
 
     expect(result).toBe(true);
     expect(existsSync(testWalletFile)).toBe(true);
-    expect(promptCallCount).toBe(2); // One for creation prompt, one for confirmation prompt
+    expect(promptCallCount).toBe(2);
 
     // Verify it was encrypted with the correct password by decrypting it
     expect(() => {
       const encrypted = readFileSync(testWalletFile);
-      decryptBuffer(encrypted, "supersecret");
+      decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
     }).not.toThrow();
   });
 
@@ -97,12 +97,12 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
     try { unlinkSync(testWalletFile); } catch { }
 
     // Initialize the wallet
-    mockPasswordValue = "supersecret";
-    mockConfirmValue = "supersecret";
+    mockPasswordValue = "supersecret12";
+    mockConfirmValue = "supersecret12";
     await ensureWalletExists(testWalletFile);
 
     // Add key-value pair
-    mockPasswordValue = "supersecret"; // wallet decryption password
+    mockPasswordValue = "supersecret12"; // wallet decryption password
     mockKeyValue = "my-secret-value"; // value for key
     promptCallCount = 0;
 
@@ -112,19 +112,19 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
 
     // Verify the entry was written by decrypting in-memory and checking JSON entries record
     const encrypted = readFileSync(testWalletFile);
-    const decrypted = decryptBuffer(encrypted, "supersecret");
+    const decrypted = decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
     const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBe("my-secret-value");
   });
 
   test("lists keys in the wallet successfully", async () => {
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
     const result = await listWalletKeys(testWalletFile);
     expect(result).toBe(true);
   });
 
   test("copies a key value to clipboard successfully", async () => {
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
     clipboardContent = "";
 
     const result = await copyWalletValue("mykey", testWalletFile);
@@ -133,14 +133,14 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
   });
 
   test("deletes a key from the wallet successfully", async () => {
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
 
     const result = await deleteWalletKey("mykey", testWalletFile);
     expect(result).toBe(true);
 
     // Verify key is deleted in-memory
     const encrypted = readFileSync(testWalletFile);
-    const decrypted = decryptBuffer(encrypted, "supersecret");
+    const decrypted = decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
     const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBeUndefined();
   });

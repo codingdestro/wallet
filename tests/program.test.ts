@@ -46,37 +46,37 @@ describe("CLI program integration", () => {
     const program = createProgram();
 
     // 1. Init command
-    mockPasswordValue = "supersecret";
-    mockConfirmValue = "supersecret";
+    mockPasswordValue = "supersecret12";
+    mockConfirmValue = "supersecret12";
     await program.parseAsync(["node", "index.js", "init", "-f", testWallet]);
     expect(existsSync(testWallet)).toBe(true);
 
     // 2. Add command
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
     mockKeyValue = "my-secret-key-value";
     const programAdd = createProgram();
     await programAdd.parseAsync(["node", "index.js", "add", "mykey", "-f", testWallet]);
 
     // 3. List command
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
     const programList = createProgram();
     await programList.parseAsync(["node", "index.js", "list", "-f", testWallet]);
 
     // 4. Copy command
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
     clipboardContent = "";
     const programCopy = createProgram();
     await programCopy.parseAsync(["node", "index.js", "copy", "mykey", "-f", testWallet]);
     expect(clipboardContent).toBe("my-secret-key-value");
 
     // 5. Delete command
-    mockPasswordValue = "supersecret";
+    mockPasswordValue = "supersecret12";
     const programDelete = createProgram();
     await programDelete.parseAsync(["node", "index.js", "delete", "mykey", "-f", testWallet]);
 
     // Verify it is gone in-memory
     const encrypted = readFileSync(testWallet);
-    const decrypted = decryptBuffer(encrypted, "supersecret");
+    const decrypted = decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
     const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBeUndefined();
   });
