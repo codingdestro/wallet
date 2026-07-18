@@ -1,9 +1,71 @@
-import { existsSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, writeFileSync, readFileSync, chmodSync, openSync, closeSync, readdirSync, unlinkSync } from 'fs';
+import { dirname, basename, join } from 'path';
 import { encryptBuffer, decryptBuffer } from './crypto.js';
 import { promptPassword } from './prompts.js';
 import { copyToClipboard } from './clipboard.js';
 import { logger } from './logger.js';
+import { validateKey } from './userpath.js';
 import pc from 'picocolors';
+
+const MIN_PASSWORD_LENGTH = 12
+const MAX_FAILED_ATTEMPTS = 5
+const FILE_MODE = 0o600
+
+let failedAttempts = 0
+
+function sanitizePassword(password: string): Buffer {
+  const buf = Buffer.from(password, 'utf-8')
+  return buf
+}
+
+function clearBuffer(buf: Buffer): void {
+  buf.fill(0)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function acquireLock(walletPath: string): { release: () => void } {
+  const lockPath = walletPath + '.lock.' + process.pid
+  const base = basename(walletPath)
+
+  // Clean up locks from dead processes
+  try {
+    const dir = dirname(walletPath)
+    const files = readdirSync(dir)
+    for (const f of files) {
+      if (f.startsWith(base + '.lock.')) {
+        const pidStr = f.slice((base + '.lock.').length)
+        const pid = parseInt(pidStr, 10)
+        if (!isNaN(pid) && !isProcessRunning(pid)) {
+          try { unlinkSync(join(dir, f)) } catch {}
+        }
+      }
+    }
+  } catch {}
+
+  try {
+    const fd = openSync(lockPath, 'wx')
+    closeSync(fd)
+  } catch {
+    throw new Error('locked')
+  }
+  return {
+    release: () => {
+      try { unlinkSync(lockPath) } catch {}
+    }
+  }
+}
 
 /**
  * Checks if the wallet file exists. If it does not, prompts the user
@@ -34,8 +96,8 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
         logger.error('empty');
         continue;
       }
-      if (pwd.length < 4) {
-        logger.error('min 4 chars');
+      if (pwd.length < MIN_PASSWORD_LENGTH) {
+        logger.error(`min ${MIN_PASSWORD_LENGTH} chars`);
         continue;
       }
       password = pwd;
@@ -75,20 +137,23 @@ export async function ensureWalletExists(walletPath: string): Promise<boolean> {
 
   logger.status('initializing');
 
+  const pwdBuf = sanitizePassword(password)
+
   try {
-    // Construct default empty wallet in memory
     const walletData = { version: '1.0.0', entries: {} };
     const buffer = Buffer.from(JSON.stringify(walletData), 'utf-8');
 
-    // Encrypt in memory and write directly to disk
-    const encrypted = encryptBuffer(buffer, password);
-    writeFileSync(walletPath, encrypted);
+    const encrypted = encryptBuffer(buffer, pwdBuf);
+    writeFileSync(walletPath, encrypted, { mode: FILE_MODE });
+    chmodSync(walletPath, FILE_MODE);
 
     logger.success('initialized');
     return true;
   } catch (err: any) {
     logger.error(`init failed: ${err.message}`);
     return false;
+  } finally {
+    clearBuffer(pwdBuf)
   }
 }
 
@@ -104,6 +169,8 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
     return false;
   }
 
+  validateKey(key)
+
   const password = await promptPassword(pc.cyan('password: '));
   if (password === null) {
     logger.warn('cancelled');
@@ -114,47 +181,67 @@ export async function addWalletKey(key: string, walletPath: string): Promise<boo
     return false;
   }
 
-  let walletData: { version: string; entries: Record<string, string> };
+  const pwdBuf = sanitizePassword(password)
+
+  let lock: { release: () => void } | undefined
 
   try {
-    // Read and decrypt in memory
-    const encryptedData = readFileSync(walletPath);
-    const decrypted = decryptBuffer(encryptedData, password);
-    const rawContent = decrypted.toString('utf-8');
-    walletData = JSON.parse(rawContent);
-  } catch (err) {
-    logger.error('bad password or corrupted wallet');
-    return false;
-  }
+    try {
+      lock = acquireLock(walletPath)
+    } catch {
+      logger.error('locked')
+      return false
+    }
 
-  const value = await promptPassword(pc.cyan(`value for "${key}": `));
-  if (value === null) {
-    logger.warn('cancelled');
-    return false;
-  }
-  if (!value) {
-    logger.error('empty value');
-    return false;
-  }
+    let walletData: { version: string; entries: Record<string, string> };
 
-  // Safeguard against legacy array format or missing entries
-  if (!walletData.entries || Array.isArray(walletData.entries)) {
-    walletData.entries = {};
-  }
-  walletData.entries[key] = value;
+    try {
+      const encryptedData = readFileSync(walletPath);
+      const decrypted = decryptBuffer(encryptedData, pwdBuf);
+      const rawContent = decrypted.toString('utf-8');
+      walletData = JSON.parse(rawContent);
+      failedAttempts = 0
+    } catch (err) {
+      failedAttempts++
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        logger.error('too many failed attempts, try again later')
+        process.exit(1)
+      }
+      const delay = Math.pow(2, failedAttempts) * 500
+      logger.error('bad password or corrupted wallet')
+      await sleep(delay)
+      return false;
+    }
 
-  logger.status('saving');
+    const value = await promptPassword(pc.cyan(`value for "${key}": `));
+    if (value === null) {
+      logger.warn('cancelled');
+      return false;
+    }
+    if (!value) {
+      logger.error('empty value');
+      return false;
+    }
 
-  try {
-    // Serialize, encrypt in memory and write directly to disk
+    if (!walletData.entries || Array.isArray(walletData.entries)) {
+      walletData.entries = {};
+    }
+    walletData.entries[key] = value;
+
+    logger.status('saving');
+
     const buffer = Buffer.from(JSON.stringify(walletData), 'utf-8');
-    const encrypted = encryptBuffer(buffer, password);
-    writeFileSync(walletPath, encrypted);
+    const encrypted = encryptBuffer(buffer, pwdBuf);
+    writeFileSync(walletPath, encrypted, { mode: FILE_MODE });
+    chmodSync(walletPath, FILE_MODE);
 
     return true;
   } catch (err: any) {
     logger.error(`save failed: ${err.message}`);
     return false;
+  } finally {
+    clearBuffer(pwdBuf)
+    lock?.release();
   }
 }
 
@@ -179,29 +266,42 @@ export async function listWalletKeys(walletPath: string): Promise<boolean> {
     return false;
   }
 
-  let walletData: { version: string; entries: Record<string, string> };
+  const pwdBuf = sanitizePassword(password)
 
   try {
-    // Read and decrypt in memory
-    const encryptedData = readFileSync(walletPath);
-    const decrypted = decryptBuffer(encryptedData, password);
-    const rawContent = decrypted.toString('utf-8');
-    walletData = JSON.parse(rawContent);
-  } catch (err) {
-    logger.error('bad password or corrupted wallet');
-    return false;
-  }
+    let walletData: { version: string; entries: Record<string, string> };
 
-  const keys = Object.keys(walletData.entries || {});
-  if (keys.length === 0) {
-    logger.warn('empty');
-  } else {
-    for (const key of keys) {
-      logger.item(key);
+    try {
+      const encryptedData = readFileSync(walletPath);
+      const decrypted = decryptBuffer(encryptedData, pwdBuf);
+      const rawContent = decrypted.toString('utf-8');
+      walletData = JSON.parse(rawContent);
+      failedAttempts = 0
+    } catch (err) {
+      failedAttempts++
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        logger.error('too many failed attempts, try again later')
+        process.exit(1)
+      }
+      const delay = Math.pow(2, failedAttempts) * 500
+      logger.error('bad password or corrupted wallet')
+      await sleep(delay)
+      return false;
     }
-  }
 
-  return true;
+    const keys = Object.keys(walletData.entries || {});
+    if (keys.length === 0) {
+      logger.warn('empty');
+    } else {
+      for (const key of keys) {
+        logger.item(key);
+      }
+    }
+
+    return true;
+  } finally {
+    clearBuffer(pwdBuf)
+  }
 }
 
 /**
@@ -227,33 +327,47 @@ export async function copyWalletValue(key: string, walletPath: string): Promise<
     return false;
   }
 
-  let walletData: { version: string; entries: Record<string, string> };
+  const pwdBuf = sanitizePassword(password)
 
   try {
-    // Read and decrypt in memory
-    const encryptedData = readFileSync(walletPath);
-    const decrypted = decryptBuffer(encryptedData, password);
-    const rawContent = decrypted.toString('utf-8');
-    walletData = JSON.parse(rawContent);
-  } catch (err) {
-    logger.error('bad password or corrupted wallet');
-    return false;
-  }
+    let walletData: { version: string; entries: Record<string, string> };
 
-  const entries = walletData.entries || {};
-  if (!(key in entries)) {
-    logger.error(`key not found: ${key}`);
-    return false;
-  }
+    try {
+      const encryptedData = readFileSync(walletPath);
+      const decrypted = decryptBuffer(encryptedData, pwdBuf);
+      const rawContent = decrypted.toString('utf-8');
+      walletData = JSON.parse(rawContent);
+      failedAttempts = 0
+    } catch (err) {
+      failedAttempts++
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        logger.error('too many failed attempts, try again later')
+        process.exit(1)
+      }
+      const delay = Math.pow(2, failedAttempts) * 500
+      logger.error('bad password or corrupted wallet')
+      await sleep(delay)
+      return false;
+    }
 
-  try {
-    // Zero-dependency native copy utility
-    await copyToClipboard(entries[key]);
-    logger.success(`copied: ${key}`);
-    return true;
-  } catch (err: any) {
-    logger.error(`clipboard: ${err.message}`);
-    return false;
+    const entries = walletData.entries || {};
+    if (!(key in entries)) {
+      logger.error(`key not found: ${key}`);
+      return false;
+    }
+
+    const secret = entries[key]
+
+    try {
+      await copyToClipboard(secret);
+      logger.success(`copied: ${key}`);
+      return true;
+    } catch (err: any) {
+      logger.error(`clipboard: ${err.message}`);
+      return false;
+    }
+  } finally {
+    clearBuffer(pwdBuf)
   }
 }
 
@@ -280,38 +394,58 @@ export async function deleteWalletKey(key: string, walletPath: string): Promise<
     return false;
   }
 
-  let walletData: { version: string; entries: Record<string, string> };
+  const pwdBuf = sanitizePassword(password)
+  let lock: { release: () => void } | undefined
 
   try {
-    // Read and decrypt in memory
-    const encryptedData = readFileSync(walletPath);
-    const decrypted = decryptBuffer(encryptedData, password);
-    const rawContent = decrypted.toString('utf-8');
-    walletData = JSON.parse(rawContent);
-  } catch (err) {
-    logger.error('bad password or corrupted wallet');
-    return false;
-  }
+    try {
+      lock = acquireLock(walletPath)
+    } catch {
+      logger.error('locked')
+      return false
+    }
 
-  const entries = walletData.entries || {};
-  if (!(key in entries)) {
-    logger.error(`key not found: ${key}`);
-    return false;
-  }
+    let walletData: { version: string; entries: Record<string, string> };
 
-  delete entries[key];
+    try {
+      const encryptedData = readFileSync(walletPath);
+      const decrypted = decryptBuffer(encryptedData, pwdBuf);
+      const rawContent = decrypted.toString('utf-8');
+      walletData = JSON.parse(rawContent);
+      failedAttempts = 0
+    } catch (err) {
+      failedAttempts++
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        logger.error('too many failed attempts, try again later')
+        process.exit(1)
+      }
+      const delay = Math.pow(2, failedAttempts) * 500
+      logger.error('bad password or corrupted wallet')
+      await sleep(delay)
+      return false;
+    }
 
-  logger.status('saving');
+    const entries = walletData.entries || {};
+    if (!(key in entries)) {
+      logger.error(`key not found: ${key}`);
+      return false;
+    }
 
-  try {
-    // Serialize, encrypt in memory and write directly to disk
+    delete entries[key];
+
+    logger.status('saving');
+
     const buffer = Buffer.from(JSON.stringify(walletData), 'utf-8');
-    const encrypted = encryptBuffer(buffer, password);
-    writeFileSync(walletPath, encrypted);
+    const encrypted = encryptBuffer(buffer, pwdBuf);
+    writeFileSync(walletPath, encrypted, { mode: FILE_MODE });
+    chmodSync(walletPath, FILE_MODE);
 
     return true;
   } catch (err: any) {
     logger.error(`save failed: ${err.message}`);
     return false;
+  } finally {
+    clearBuffer(pwdBuf)
+    lock?.release();
   }
 }

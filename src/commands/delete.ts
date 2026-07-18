@@ -10,6 +10,11 @@ export function registerDeleteCommand(program: Command) {
     .option('-f, --file <path>', 'Custom path for the wallet file', 'default')
     .description('Delete a key-value pair from the wallet')
     .action(async (key, options) => {
-      await deleteWalletKey(key, userPath(options.file));
+      try {
+        await deleteWalletKey(key, userPath(options.file));
+      } catch (err: any) {
+        process.stderr.write(`error: ${err.message}\n`);
+        process.exit(1);
+      }
     });
 }

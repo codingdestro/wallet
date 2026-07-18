@@ -9,6 +9,11 @@ export function registerListCommand(program: Command) {
     .description('List all keys in the wallet')
     .option('-f, --file <path>', 'Custom path for the wallet file', 'default')
     .action(async (options) => {
-      await listWalletKeys(userPath(options.file));
+      try {
+        await listWalletKeys(userPath(options.file));
+      } catch (err: any) {
+        process.stderr.write(`error: ${err.message}\n`);
+        process.exit(1);
+      }
     });
 }
