@@ -4,6 +4,7 @@ import { registerAddCommand } from "./commands/add.js";
 import { registerListCommand } from "./commands/list.js";
 import { registerCopyCommand } from "./commands/copy.js";
 import { registerDeleteCommand } from "./commands/delete.js";
+import { registerPasswdCommand } from "./commands/passwd.js";
 import { setLogLevel } from "./utils/logger.js";
 
 export function createProgram() {
@@ -27,6 +28,7 @@ export function createProgram() {
   registerListCommand(program);
   registerCopyCommand(program);
   registerDeleteCommand(program);
+  registerPasswdCommand(program);
 
   return program;
 }

@@ -372,6 +372,120 @@ export async function copyWalletValue(key: string, walletPath: string): Promise<
 }
 
 /**
+ * Prompts user for the current password to decrypt the wallet, then prompts
+ * for a new password (with confirmation) and re-encrypts the wallet with it.
+ * @param walletPath Path to the wallet file (default: 'wallet.enc')
+ */
+export async function changeWalletPassword(walletPath: string): Promise<boolean> {
+  const exists = existsSync(walletPath);
+  if (!exists) {
+    logger.error('not found');
+    return false;
+  }
+
+  const password = await promptPassword(pc.cyan('password: '));
+  if (password === null) {
+    logger.warn('cancelled');
+    return false;
+  }
+  if (!password) {
+    logger.error('empty');
+    return false;
+  }
+
+  const pwdBuf = sanitizePassword(password)
+  let newPwdBuf: Buffer | undefined
+  let lock: { release: () => void } | undefined
+
+  try {
+    try {
+      lock = acquireLock(walletPath)
+    } catch {
+      logger.error('locked')
+      return false
+    }
+
+    let walletData: { version: string; entries: Record<string, string> };
+
+    try {
+      const encryptedData = readFileSync(walletPath);
+      const decrypted = decryptBuffer(encryptedData, pwdBuf);
+      const rawContent = decrypted.toString('utf-8');
+      walletData = JSON.parse(rawContent);
+      failedAttempts = 0
+    } catch (err) {
+      failedAttempts++
+      if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+        logger.error('too many failed attempts, try again later')
+        process.exit(1)
+      }
+      const delay = Math.pow(2, failedAttempts) * 500
+      logger.error('bad password or corrupted wallet')
+      await sleep(delay)
+      return false;
+    }
+
+    let newPassword = '';
+
+    while (true) {
+      let cancelled = false;
+
+      while (true) {
+        const pwd = await promptPassword(pc.cyan('new password: '));
+        if (pwd === null) {
+          cancelled = true;
+          break;
+        }
+        if (!pwd) {
+          logger.error('empty');
+          continue;
+        }
+        if (pwd.length < MIN_PASSWORD_LENGTH) {
+          logger.error(`min ${MIN_PASSWORD_LENGTH} chars`);
+          continue;
+        }
+        newPassword = pwd;
+        break;
+      }
+
+      if (cancelled) {
+        logger.warn('cancelled');
+        return false;
+      }
+
+      const confirmPwd = await promptPassword(pc.cyan('confirm: '));
+      if (confirmPwd === null) {
+        logger.warn('cancelled');
+        return false;
+      }
+
+      if (newPassword === confirmPwd) {
+        break;
+      }
+      logger.error('mismatch\n');
+    }
+
+    logger.status('saving');
+
+    newPwdBuf = sanitizePassword(newPassword)
+    const buffer = Buffer.from(JSON.stringify(walletData), 'utf-8');
+    const encrypted = encryptBuffer(buffer, newPwdBuf);
+    writeFileSync(walletPath, encrypted, { mode: FILE_MODE });
+    chmodSync(walletPath, FILE_MODE);
+
+    logger.success('password changed');
+    return true;
+  } catch (err: any) {
+    logger.error(`save failed: ${err.message}`);
+    return false;
+  } finally {
+    clearBuffer(pwdBuf)
+    if (newPwdBuf) clearBuffer(newPwdBuf)
+    lock?.release();
+  }
+}
+
+/**
  * Prompts user to decrypt the wallet, deletes the key from entries,
  * and encrypts the updated entries back to the file.
  * @param key The key to delete

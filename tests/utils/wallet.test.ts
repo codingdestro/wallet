@@ -6,6 +6,7 @@ import { decryptBuffer } from "../../src/utils/crypto.js";
 let mockPasswordValue: string | null = "my-password";
 let mockConfirmValue: string | null = "my-password";
 let mockKeyValue: string | null = "my-value";
+let mockNewPasswordValue: string | null = "new-password";
 let promptCallCount = 0;
 
 // Mock the local prompts utility module
@@ -18,6 +19,9 @@ mock.module("../../src/utils/prompts.js", () => {
       }
       if (query.includes("value for")) {
         return mockKeyValue;
+      }
+      if (query.includes("new password")) {
+        return mockNewPasswordValue;
       }
       return mockPasswordValue;
     }
@@ -39,7 +43,8 @@ import {
   addWalletKey,
   listWalletKeys,
   copyWalletValue,
-  deleteWalletKey
+  deleteWalletKey,
+  changeWalletPassword
 } from "../../src/utils/wallet.js";
 import { userPath } from "../../src/utils/userpath.js";
 
@@ -143,5 +148,70 @@ describe("Wallet Initialization & Key-Value Utilities", () => {
     const decrypted = decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
     const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBeUndefined();
+  });
+
+  test("changes the wallet password successfully", async () => {
+    try { unlinkSync(testWalletFile); } catch { }
+
+    // Initialize with the old password and add an entry
+    mockPasswordValue = "oldpassword123";
+    mockConfirmValue = "oldpassword123";
+    await ensureWalletExists(testWalletFile);
+    mockKeyValue = "my-secret-value";
+    await addWalletKey("mykey", testWalletFile);
+
+    // Change the password
+    mockPasswordValue = "oldpassword123";
+    mockNewPasswordValue = "newpassword456";
+    mockConfirmValue = "newpassword456";
+
+    const result = await changeWalletPassword(testWalletFile);
+    expect(result).toBe(true);
+
+    // Old password no longer decrypts the wallet
+    const encrypted = readFileSync(testWalletFile);
+    expect(() => {
+      decryptBuffer(encrypted, Buffer.from("oldpassword123", "utf-8"));
+    }).toThrow();
+
+    // New password decrypts and entries are preserved
+    const decrypted = decryptBuffer(encrypted, Buffer.from("newpassword456", "utf-8"));
+    const data = JSON.parse(decrypted.toString("utf-8"));
+    expect(data.entries["mykey"]).toBe("my-secret-value");
+  });
+
+  test("rejects password change with wrong current password", async () => {
+    mockPasswordValue = "wrongpassword999";
+
+    const result = await changeWalletPassword(testWalletFile);
+    expect(result).toBe(false);
+
+    // Wallet is still decryptable with the real password
+    const encrypted = readFileSync(testWalletFile);
+    const decrypted = decryptBuffer(encrypted, Buffer.from("newpassword456", "utf-8"));
+    const data = JSON.parse(decrypted.toString("utf-8"));
+    expect(data.entries["mykey"]).toBe("my-secret-value");
+  });
+
+  test("cancels password change when new password prompt is cancelled", async () => {
+    mockPasswordValue = "newpassword456";
+    mockNewPasswordValue = null; // simulate cancellation at new password prompt
+
+    const result = await changeWalletPassword(testWalletFile);
+    expect(result).toBe(false);
+
+    // Wallet remains unchanged
+    const encrypted = readFileSync(testWalletFile);
+    expect(() => {
+      decryptBuffer(encrypted, Buffer.from("newpassword456", "utf-8"));
+    }).not.toThrow();
+  });
+
+  test("returns false for password change when wallet file does not exist", async () => {
+    const missingWalletFile = "temp_missing_wallet.enc";
+    try { unlinkSync(missingWalletFile); } catch { }
+
+    const result = await changeWalletPassword(missingWalletFile);
+    expect(result).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import { decryptBuffer } from "../src/utils/crypto.js";
 let mockPasswordValue: string | null = "my-password";
 let mockConfirmValue: string | null = "my-password";
 let mockKeyValue: string | null = "my-value";
+let mockNewPasswordValue: string | null = "new-password";
 
 mock.module("../src/utils/prompts.js", () => {
   return {
@@ -15,6 +16,9 @@ mock.module("../src/utils/prompts.js", () => {
       }
       if (query.includes("value for")) {
         return mockKeyValue;
+      }
+      if (query.includes("new password")) {
+        return mockNewPasswordValue;
       }
       return mockPasswordValue;
     }
@@ -79,5 +83,34 @@ describe("CLI program integration", () => {
     const decrypted = decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
     const data = JSON.parse(decrypted.toString("utf-8"));
     expect(data.entries["mykey"]).toBeUndefined();
+  });
+
+  test("runs passwd command to change the wallet password", async () => {
+    try { unlinkSync(testWallet); } catch { }
+
+    // Init and add an entry with the old password
+    mockPasswordValue = "supersecret12";
+    mockConfirmValue = "supersecret12";
+    await createProgram().parseAsync(["node", "index.js", "init", "-f", testWallet]);
+
+    mockKeyValue = "my-secret-key-value";
+    await createProgram().parseAsync(["node", "index.js", "add", "mykey", "-f", testWallet]);
+
+    // Change the password
+    mockPasswordValue = "supersecret12";
+    mockNewPasswordValue = "brandnewpass99";
+    mockConfirmValue = "brandnewpass99";
+    await createProgram().parseAsync(["node", "index.js", "passwd", "-f", testWallet]);
+
+    // Old password no longer decrypts the wallet
+    const encrypted = readFileSync(testWallet);
+    expect(() => {
+      decryptBuffer(encrypted, Buffer.from("supersecret12", "utf-8"));
+    }).toThrow();
+
+    // New password decrypts and entries are preserved
+    const decrypted = decryptBuffer(encrypted, Buffer.from("brandnewpass99", "utf-8"));
+    const data = JSON.parse(decrypted.toString("utf-8"));
+    expect(data.entries["mykey"]).toBe("my-secret-key-value");
   });
 });
