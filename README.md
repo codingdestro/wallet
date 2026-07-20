@@ -29,6 +29,9 @@ wallet copy my-api-key
 
 # Delete a secret
 wallet delete my-api-key
+
+# Change the master password
+wallet passwd
 ```
 
 ## Commands
@@ -40,6 +43,7 @@ wallet delete my-api-key
 | `wallet list`         | `l`   | List all stored key names          |
 | `wallet copy <key>`   | `c`   | Copy a secret to clipboard         |
 | `wallet delete <key>` | `d`   | Remove a secret                    |
+| `wallet passwd`       |       | Change the master password         |
 
 All commands accept `-f, --file <path>` to specify a custom wallet file (default: `wallet.enc`).
 
